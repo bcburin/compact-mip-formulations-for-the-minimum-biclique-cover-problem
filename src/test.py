@@ -1,0 +1,112 @@
+import networkx as nx
+from networkx.algorithms import approximation
+import matplotlib.pyplot as plt
+
+import vertex_cover
+import independent_set
+import heuristic
+import biclique
+import iuc
+import directed_stars
+import graph
+import edge_indep_set
+import edge_indep
+from const import *
+
+from gerrychain import (GeographicPartition, Graph, MarkovChain, updaters, constraints, accept)
+
+
+# def reorder_heuristic_ind()
+
+def solve_bc(G, form, use_lower=False):
+    print("Number of edges: ", len(G.edges))
+    
+    print("Number of nodes: ", len(G.nodes))
+       
+    
+    #nx.draw(G)
+    
+    # find a vertex cover of G which is an upper bound for the minimum biclique covering problem (MBCP)
+    vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
+    
+    # find an independent set of G which is a lower bound for the minimum biclique covering problem (MBCP)
+    #indep_number = independent_set.solve(G)
+    # indep_number = directed_stars.solve(G)
+    
+    # print("iuc_number: ", indep_number)
+    if (use_lower):
+        indep_edges = edge_indep.solve(G)
+    else:
+        indep_edges = []
+    print("indep_number: ", len(indep_edges))
+    
+    # print("vertex cover number: ", vertex_cover_number)
+#    print("vertex cover set: ", vertex_cover_set)
+#    return
+    
+    # find a heuristic solution for the MBCP based on the vertex cover set
+    heuristic_sol = heuristic.find_cover(G, vertex_cover_set)
+    
+    # print("heuristic solution: ", heuristic_sol)
+    
+    if (form == 1):
+        sol = biclique.get_vertex_bc_from_edge(G, heuristic_sol)
+        print(sol)
+        biclique_cover = biclique.solve_v(G, sol, indep_edges=indep_edges)
+        print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
+    elif (form == 2):
+        biclique_cover = biclique.solve(G, heuristic_sol, indep_edges=indep_edges)
+        print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
+    elif (form == 3):
+        biclique_cover = biclique.solve_recursive(G, heuristic_sol, indep_edges=indep_edges)
+        print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
+
+
+def readGraph(level, state, level_name):
+    return Graph.from_json("../data/"+level+"/json/"+state+"_"+level_name+".json")
+
+# read input graph G
+state = "AR"
+code = state_codes[state]
+num_dist = congressional_districts[state]
+level = "county"
+level_name = "counties"
+
+# G = nx.karate_club_graph()
+# G = readGraph(level, state, level_name)
+def build_graph_from_file(fname):
+    if fname[-4:] == '.gml' :
+        G = nx.read_gml(fname, label='id')
+
+    elif fname[-4:] == '.txt' :
+        with open(fname, "r") as f:
+            m = int(f.readline().strip().split()[-1])
+            edges = [None for _ in range(m)]
+            for index in range(m):
+                line = f.readline().strip().split()
+                u, v = int(line[0]), int(line[1])
+                if (u < v):
+                    edges[index] = (u, v)
+                else:
+                    edges[index] = (v, u)
+        G = nx.Graph()
+        print(edges)
+        G.add_edges_from(edges)
+
+    else:
+        raise ValueError(f"File extension of {fname} not recognized, unsure of how to build graph.")
+
+    return G
+
+G = build_graph_from_file("../graph/erdos_renyi_100_8_0.txt")
+solve_bc(G, 1, use_lower=True)
+
+# edge_indep.solve(G)
+# vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
+# print("vertex_cover: ", vertex_cover_number)
+
+# directed_stars.solve(G)
+
+print("The edge of G: ", len(G.edges), " Nodes: ", len(G.nodes))
+ 
+
