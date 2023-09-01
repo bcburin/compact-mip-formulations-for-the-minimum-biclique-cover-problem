@@ -7,7 +7,7 @@ from itertools import combinations
 
 
 def solve(G):
-    DG = nx.DiGraph(G) # bidirected version of G
+    DG = nx.DiGraph(G) # bidirected version of g
     
     # define model
     m = gp.Model()

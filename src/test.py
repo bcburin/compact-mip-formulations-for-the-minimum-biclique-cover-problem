@@ -1,19 +1,12 @@
-import networkx as nx
-from networkx.algorithms import approximation
-import matplotlib.pyplot as plt
-
 import vertex_cover
-import independent_set
 import heuristic
 import biclique
-import iuc
-import directed_stars
-import graph
-import edge_indep_set
 import edge_indep
 from const import *
 
-from gerrychain import (GeographicPartition, Graph, MarkovChain, updaters, constraints, accept)
+from gerrychain import (Graph)
+
+from src.util import build_graph_from_file
 
 
 # def reorder_heuristic_ind()
@@ -24,14 +17,14 @@ def solve_bc(G, form, use_lower=False):
     print("Number of nodes: ", len(G.nodes))
        
     
-    #nx.draw(G)
+    #nx.draw(g)
     
-    # find a vertex cover of G which is an upper bound for the minimum biclique covering problem (MBCP)
+    # find a vertex cover of g which is an upper bound for the minimum biclique covering problem (MBCP)
     vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
     
-    # find an independent set of G which is a lower bound for the minimum biclique covering problem (MBCP)
-    #indep_number = independent_set.solve(G)
-    # indep_number = directed_stars.solve(G)
+    # find an independent set of g which is a lower bound for the minimum biclique covering problem (MBCP)
+    #indep_number = independent_set.solve(g)
+    # indep_number = directed_stars.solve(g)
     
     # print("iuc_number: ", indep_number)
     if (use_lower):
@@ -65,48 +58,28 @@ def solve_bc(G, form, use_lower=False):
 def readGraph(level, state, level_name):
     return Graph.from_json("../data/"+level+"/json/"+state+"_"+level_name+".json")
 
-# read input graph G
+# read input graph g
 state = "AR"
 code = state_codes[state]
 num_dist = congressional_districts[state]
 level = "county"
 level_name = "counties"
 
-# G = nx.karate_club_graph()
-# G = readGraph(level, state, level_name)
-def build_graph_from_file(fname):
-    if fname[-4:] == '.gml' :
-        G = nx.read_gml(fname, label='id')
 
-    elif fname[-4:] == '.txt' :
-        with open(fname, "r") as f:
-            m = int(f.readline().strip().split()[-1])
-            edges = [None for _ in range(m)]
-            for index in range(m):
-                line = f.readline().strip().split()
-                u, v = int(line[0]), int(line[1])
-                if (u < v):
-                    edges[index] = (u, v)
-                else:
-                    edges[index] = (v, u)
-        G = nx.Graph()
-        print(edges)
-        G.add_edges_from(edges)
+# g = nx.karate_club_graph()
+# g = readGraph(level, state, level_name)
 
-    else:
-        raise ValueError(f"File extension of {fname} not recognized, unsure of how to build graph.")
 
-    return G
+if __name__ == "__main__":
+    G = build_graph_from_file("../graph/erdos_renyi_100_8_0.txt")
+    solve_bc(G, 1, use_lower=True)
 
-G = build_graph_from_file("../graph/erdos_renyi_100_8_0.txt")
-solve_bc(G, 1, use_lower=True)
+    # edge_indep.solve(g)
+    # vertex_cover_number, vertex_cover_set = vertex_cover.solve(g)
+    # print("vertex_cover: ", vertex_cover_number)
 
-# edge_indep.solve(G)
-# vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
-# print("vertex_cover: ", vertex_cover_number)
+    # directed_stars.solve(g)
 
-# directed_stars.solve(G)
-
-print("The edge of G: ", len(G.edges), " Nodes: ", len(G.nodes))
+    print("The edge of g: ", len(G.edges), " Nodes: ", len(G.nodes))
  
 

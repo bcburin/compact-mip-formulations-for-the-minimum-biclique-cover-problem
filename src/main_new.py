@@ -23,15 +23,14 @@ def solve_bc(G, form, use_lower=False):
     
     print("Number of nodes: ", len(G.nodes))
        
+    # nx.draw(g)
     
-    #nx.draw(G)
-    
-    # find a vertex cover of G which is an upper bound for the minimum biclique covering problem (MBCP)
+    # find a vertex cover of g which is an upper bound for the minimum biclique covering problem (MBCP)
     vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
     
-    # find an independent set of G which is a lower bound for the minimum biclique covering problem (MBCP)
-    #indep_number = independent_set.solve(G)
-    # indep_number = directed_stars.solve(G)
+    # find an independent set of g which is a lower bound for the minimum biclique covering problem (MBCP)
+    # indep_number = independent_set.solve(g)
+    # indep_number = directed_stars.solve(g)
     
     # print("iuc_number: ", indep_number)
     if (use_lower):
@@ -65,23 +64,25 @@ def solve_bc(G, form, use_lower=False):
 def readGraph(level, state, level_name):
     return Graph.from_json("../data/"+level+"/json/"+state+"_"+level_name+".json")
 
-# read input graph G
-state = "AR"
-code = state_codes[state]
-num_dist = congressional_districts[state]
-level = "county"
-level_name = "counties"
 
-G = nx.karate_club_graph()
-# G = readGraph(level, state, level_name)
-solve_bc(G, 3, use_lower=True)
+if __name__ == "__main__":
+    # read input graph g
+    state = "AR"
+    code = state_codes[state]
+    num_dist = congressional_districts[state]
+    level = "county"
+    level_name = "counties"
 
-# edge_indep.solve(G)
-# vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
-# print("vertex_cover: ", vertex_cover_number)
+    G = nx.karate_club_graph()
+    # g = readGraph(level, state, level_name)
+    solve_bc(G, 3, use_lower=True)
 
-# directed_stars.solve(G)
+    # edge_indep.solve(g)
+    # vertex_cover_number, vertex_cover_set = vertex_cover.solve(g)
+    # print("vertex_cover: ", vertex_cover_number)
 
-print("The edge of G: ", len(G.edges), " Nodes: ", len(G.nodes))
+    # directed_stars.solve(g)
+
+    print("The edge of g: ", len(G.edges), " Nodes: ", len(G.nodes))
  
 

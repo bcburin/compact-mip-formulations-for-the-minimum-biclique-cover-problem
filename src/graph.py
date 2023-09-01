@@ -1,11 +1,12 @@
 import networkx as nx
 import numpy as np
 
+
 def create_conflict_graph(node_sets):
     G = nx.Graph()
     for node_set in node_sets:
         for node in node_set:
-            if (not G.has_node(node)):
+            if not G.has_node(node):
                 G.add_node(node)
     for node_set in node_sets:
         for n1 in node_set:
@@ -15,6 +16,7 @@ def create_conflict_graph(node_sets):
     
     GC = nx.complement(G)
     return GC
+
 
 def create_SOSk_node_sets(bps, k):
     if (bps <= 0) or (k <= 0):

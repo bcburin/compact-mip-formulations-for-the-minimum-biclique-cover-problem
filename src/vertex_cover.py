@@ -1,6 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB 
 
+
 def solve(G):
     # define model
     m = gp.Model()
@@ -21,8 +22,9 @@ def solve(G):
     m.optimize()
     
     if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
-        cover_set = [ v for v in G.nodes if X[v].x > 0.5 ]
+        cover_set = [v for v in G.nodes if X[v].x > 0.5]
         return m.objVal, cover_set
-    else: print("There is an error in the vertex cover problem!")
+    else:
+        print("There is an error in the vertex cover problem!")
     
     

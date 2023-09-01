@@ -6,6 +6,7 @@ import time
 import networkx as nx
 from itertools import combinations
 
+
 def get_v_bicliques(G, X, k):
     bcs = []
     for b in range(k):
@@ -19,6 +20,7 @@ def get_v_bicliques(G, X, k):
         if A != [] and B != []:
             bcs.append((A, B))
     return bcs
+
 
 def get_vertex_bc_from_edge(G, edge_set):
     node_set = []
@@ -47,6 +49,7 @@ def get_vertex_bc_from_edge(G, edge_set):
                 A.append(u)
         node_set.append((A, B))
     return node_set
+
 
 # Get biclique covers from the formulations with edge.
 def get_v_bicliques_from_e(G, Y, k):
@@ -77,6 +80,7 @@ def get_v_bicliques_from_e(G, Y, k):
                 A.append(u)
         bcs.append((A, B))
     return bcs
+
 
 # Each biclique is written as two disjoint set of nodes.
 # Check whether it is a biclique cover.
@@ -114,7 +118,7 @@ def build_bottom_up_model_v(G, k, indep_edges, maximal_con):
     GC = nx.complement(DG)
     print("k: ", k)
         
-    # print("edge_set: ", G.edges)
+    # print("edge_set: ", g.edges)
         
     # define vars
     Z = m.addVars(range(k), vtype=GRB.BINARY, name="z")
@@ -135,6 +139,7 @@ def build_bottom_up_model_v(G, k, indep_edges, maximal_con):
     m.addConstrs(Z[b] >= Z[b+1] for b in range(k-1))
     add_base_constr_v(m, G, DG, X, Y, Z, k)
     return m, X
+
 
 def solve_recursive(G, heuristic_sol, indep_edges = [], maximal_con=True, form='v'):
     # no_solution = True
@@ -205,7 +210,7 @@ def add_base_constr_v(m, G, DG, X, Y, Z, k):
 
     return
 
-# Dual version implementation of G
+# Dual version implementation of g
 def solve_v(G, heuristic_sol, indep_edges = [], maximal_con=False):
     # define model
     m = gp.Model()
@@ -219,7 +224,7 @@ def solve_v(G, heuristic_sol, indep_edges = [], maximal_con=False):
     GC = nx.complement(DG)
     print("k: ", k)
     
-    # print("edge_set: ", G.edges)
+    # print("edge_set: ", g.edges)
     
     # define vars
     Z = m.addVars(range(k), vtype=GRB.BINARY, name="z")
@@ -296,7 +301,7 @@ def solve(G, heuristic_sol, indep_edges=[]):
     
     print("k: ", k)
     
-    # print("edge_set: ", G.edges)
+    # print("edge_set: ", g.edges)
 
     # define vars
     Z = m.addVars(range(k), vtype=GRB.BINARY, name="z")
