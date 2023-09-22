@@ -1,7 +1,5 @@
-import os
 from enum import Enum, auto
 from itertools import combinations
-from os import listdir, path
 
 import gurobipy as gp
 from gurobipy import GRB
@@ -10,7 +8,7 @@ import numpy as np
 import cvxpy as cp
 from pandas import DataFrame
 
-from util import build_graph_from_file, chronometer
+from util import get_graphs_in_store, chronometer
 
 
 class LBComputeMethod(Enum):
@@ -25,7 +23,6 @@ class UBComputeMethod(Enum):
     VERTEX = auto()
 
 
-@chronometer
 def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH) -> int:
     match method:
         case LBComputeMethod.MATCH:
@@ -132,7 +129,6 @@ def compute_lb_by_independent_edges_method(g: nx.Graph | nx.DiGraph) -> int:
         print('Encountered an attribute error')
 
 
-@chronometer
 def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER) -> int:
     match method:
         case UBComputeMethod.NUMBER:
@@ -171,13 +167,12 @@ def vertex_cover(g: nx.Graph) -> int:
 
 
 if __name__ == "__main__":
-    parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
-    graph_dir = os.path.join(parent_dir, 'graph')
     data_lb = {
         'graph': [],
         'n_nodes': [],
         'n_edges': [],
     }
+    # add lists to the data dictionary to store computation times
     for method in LBComputeMethod:
         # LOVASZ is too slow for a small number of edges
         if method == LBComputeMethod.LOVASZ:
@@ -187,25 +182,20 @@ if __name__ == "__main__":
     for method in UBComputeMethod:
         data_lb[str(method)] = []
         data_lb[f'{method}_time'] = []
-    for filename in listdir(graph_dir):
-        filepath = path.join(graph_dir, filename)
-        if not path.isfile(filepath):
-            continue
-        g = build_graph_from_file(fpath=filepath)
-        if len(g.edges) > 1000:
-            continue
-        data_lb['graph'].append(filename)
+    # iterate graphs
+    for g, g_name in get_graphs_in_store(max_edges=1000):
+        data_lb['graph'].append(g_name)
         data_lb['n_nodes'].append(len(g.nodes))
         data_lb['n_edges'].append(len(g.edges))
         for method in LBComputeMethod:
             # LOVASZ is too slow for a small number of edges
             if method == LBComputeMethod.LOVASZ:
                 continue
-            lb, total_time = find_bc_lower_bound(g, method=method)
+            lb, total_time = chronometer(find_bc_lower_bound, g, method=method)
             data_lb[str(method)].append(lb)
             data_lb[f'{method}_time'].append(total_time)
         for method in UBComputeMethod:
-            ub, total_time = find_bc_upper_bound(g, method=method)
+            ub, total_time = chronometer(find_bc_upper_bound, g, method=method)
             data_lb[str(method)].append(ub)
             data_lb[f'{method}_time'].append(total_time)
     df_bounds = DataFrame(data=data_lb)
