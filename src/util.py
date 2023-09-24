@@ -35,7 +35,13 @@ def build_graph_from_file(fpath: str):
     return g
 
 
-def get_graphs_in_store(max_nodes: int = None, max_edges: int = None, fname_regex: str = None) -> Iterable[tuple[Graph, str]]:
+def get_graphs_in_store(
+        max_nodes: int = None,
+        max_edges: int = None,
+        max_graphs: int = None,
+        fname_regex: str = None,
+        graph_dir: str = None,
+        recursive: bool = False) -> Iterable[tuple[Graph, str]]:
     """
     This function reads the contents of the "graph" directory and returns an iterable of graphs built from it.
 
@@ -45,22 +51,44 @@ def get_graphs_in_store(max_nodes: int = None, max_edges: int = None, fname_rege
                       from the sequence.
     :param max_edges: maximum amount of edges to allow in a graph. Graphs with more edges are excluded
                       from the sequence.
+    :param max_graphs: maximum amount of graphs to include in the sequence. Once reached, the iteration is stopped,
+                       i.e. the sequence ends.
+    :param graph_dir: directory in which to search for the graphs. If non is provided, the standard graph directory
+                      of the project is used.
+    :param recursive: boolean flag. If activated, graphs are also searched in subfolders of the graph directory,
+                      constrained by the same filters imposed by the other parameters. Otherwise, non-file paths
+                      are ignored. By default, it is false.
     :return: iterable containing tuples with the networkx.Graph object and the name of the graph file.
     """
 
-    parent_dir = path.abspath(path.join(getcwd(), pardir))
-    graph_dir = path.join(parent_dir, 'graph')
+    if not graph_dir:
+        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        graph_dir = path.join(parent_dir, 'graph')
+    count = 0
     for filename in listdir(graph_dir):
+        if count >= max_graphs:
+            break
         if fname_regex and not match(fname_regex, filename):
             continue
         filepath = path.join(graph_dir, filename)
         if not path.isfile(filepath):
-            continue
+            if recursive and path.isdir(filepath):
+                sub_seq = get_graphs_in_store(max_nodes=max_nodes,
+                                              max_edges=max_edges,
+                                              max_graphs=max_graphs-count,
+                                              fname_regex=fname_regex,
+                                              graph_dir=filepath,
+                                              recursive=True)
+                for sub_g, sub_name in sub_seq:
+                    yield sub_g, sub_name
+            else:
+                continue
         g = build_graph_from_file(fpath=filepath)
         if max_nodes and len(g.nodes) > max_nodes:
             continue
         if max_edges and len(g.edges) > max_edges:
             continue
+        count += 1
         yield g, filename
 
 
