@@ -8,7 +8,7 @@ import numpy as np
 import cvxpy as cp
 from pandas import DataFrame
 
-from util import get_graphs_in_store, chronometer
+from util import get_graphs_in_store, GraphReport
 
 
 class LBComputeMethod(Enum):
@@ -167,38 +167,19 @@ def vertex_cover(g: nx.Graph) -> int:
 
 
 if __name__ == "__main__":
-    data_lb = {
-        'graph': [],
-        'n_nodes': [],
-        'n_edges': [],
-    }
-    # add lists to the data dictionary to store computation times
-    for method in LBComputeMethod:
-        # LOVASZ is too slow for a small number of edges
-        if method == LBComputeMethod.LOVASZ:
-            continue
-        data_lb[str(method)] = []
-        data_lb[f'{method}_time'] = []
-    for method in UBComputeMethod:
-        data_lb[str(method)] = []
-        data_lb[f'{method}_time'] = []
+    report = GraphReport('bounds')
+    report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
+    report.add_properties([str(method) for method in UBComputeMethod])
     # iterate graphs
-    for g, g_name in get_graphs_in_store(max_edges=1000):
-        data_lb['graph'].append(g_name)
-        data_lb['n_nodes'].append(len(g.nodes))
-        data_lb['n_edges'].append(len(g.edges))
+    for g, g_name in get_graphs_in_store():
+        report.add_graph_data(g, g_name)
         for method in LBComputeMethod:
             # LOVASZ is too slow for a small number of edges
             if method == LBComputeMethod.LOVASZ:
                 continue
-            lb, total_time = chronometer(find_bc_lower_bound, g, method=method)
-            data_lb[str(method)].append(lb)
-            data_lb[f'{method}_time'].append(total_time)
+            report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g)
         for method in UBComputeMethod:
-            ub, total_time = chronometer(find_bc_upper_bound, g, method=method)
-            data_lb[str(method)].append(ub)
-            data_lb[f'{method}_time'].append(total_time)
-    df_bounds = DataFrame(data=data_lb)
-    df_bounds.to_csv('bounds.csv', index=False)
+            report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g)
+    report.save_csv()
 
 
