@@ -1,4 +1,6 @@
-from os import path, listdir, getcwd, pardir, mkdir
+from os import path, listdir, getcwd, pardir, mkdir, remove
+from itertools import combinations, product
+from random import random
 from re import match
 from time import time
 from typing import Callable, TypeVar, Iterable
@@ -6,6 +8,9 @@ from typing import Callable, TypeVar, Iterable
 import networkx as nx
 from networkx import Graph
 from pandas import DataFrame
+
+
+ReturnType = TypeVar('ReturnType')
 
 
 def get_file_extension(fname: str) -> str:
@@ -93,7 +98,86 @@ def get_graphs_in_store(
         yield g, filename
 
 
-ReturnType = TypeVar('ReturnType')
+def save_graph_in_store(
+        g: Graph,
+        g_name: str,
+        graph_dir: str = None,
+        create_dir: bool = False,
+        append_n_nodes: bool = True,
+        append_n_edges: bool = True,
+        replace: bool = False
+):
+    """
+    Save a NetworkX graph to a GML file in a specified directory, with options to modify the file name.
+
+    :param g: The NetworkX graph to be saved.
+    :param g_name: The base name for the saved graph file.
+    :param graph_dir: The directory where the graph file will be saved. If None, the default "graph" directory of
+                      the project is used.
+    :param create_dir: If True and the specified directory doesn't exist, it will be created. Defaults to False.
+    :param append_n_nodes: If True, appends the number of nodes to the file name. Defaults to True.
+    :param append_n_edges: If True, appends the number of edges to the file name. Defaults to True.
+    :param replace: If True and a file with the same name already exists, it will be replaced. If False and the
+                    file exists, a FileExistsError is raised. Defaults to False.
+    :raises FileExistsError: If a file with the same name already exists and 'replace' is False.
+    """
+
+    if not graph_dir:
+        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        graph_dir = path.join(parent_dir, 'graph')
+    if not path.isdir(graph_dir) and create_dir:
+        mkdir(graph_dir)
+    if append_n_nodes:
+        g_name += f'_{len(g.nodes)}'
+    if append_n_edges:
+        g_name += f'_{len(g.edges)}'
+    fpath = path.join(graph_dir, f'{g_name}.gml')
+    if path.isfile(fpath):
+        if replace:
+            remove(fpath)
+        else:
+            raise FileExistsError()
+    nx.write_gml(g, path=fpath)
+
+
+def build_multipartite_graph(*partition_sizes: int, edge_probability: float = 1.0) -> Graph:
+    """
+    Build a multipartite graph from the given partition sizes.
+
+    This function constructs a complete multipartite graph where each partition contains nodes that are not connected,
+    and nodes from different partitions are at most fully connected.
+
+    :param partition_sizes: Sizes of the partitions in the multipartite graph.
+    :param edge_probability: The probability of an edge being inserted between nodes from different partitions
+                             (default is 1.0, meaning always connect).
+    :return: A NetworkX graph representing the complete multipartite graph.
+
+    Example Usage:
+    ```
+    # Build a complete multipartite graph with partitions of sizes 3, 2, and 4
+    complete_multipartite_graph = build_complete_multipartite_graph(3, 2, 4)
+    ```
+
+    """
+
+    if edge_probability < 0 or edge_probability > 1:
+        raise ValueError('Probability must be between zero and one.')
+    # Create an empty graph
+    g = Graph()
+    # Create nodes for each partition and add them to the graph
+    partitions = []
+    node_counter = 0
+    for size in partition_sizes:
+        partition = range(node_counter, node_counter + size)
+        partitions.append(partition)
+        g.add_nodes_from(partition)
+        node_counter += size
+    # Connect nodes from different partitions to create a complete multipartite graph
+    for partition1, partition2 in combinations(partitions, 2):
+        for node1, node2 in product(partition1, partition2):
+            if random() <= edge_probability:  # Check if an edge should be added
+                g.add_edge(node1, node2)
+    return g
 
 
 def chronometer(f: Callable[..., ReturnType], *args, **kwargs) -> tuple[ReturnType, float]:
