@@ -1,12 +1,7 @@
-from gerrychain import Graph
 import networkx as nx
 
 from const import *
 from test import solve_bc
-
-
-def read_graph(level, state, level_name):
-    return Graph.from_json("../data/"+level+"/json/"+state+"_"+level_name+".json")
 
 
 if __name__ == "__main__":
