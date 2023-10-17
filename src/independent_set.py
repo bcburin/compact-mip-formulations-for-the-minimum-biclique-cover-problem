@@ -32,7 +32,7 @@ def get_set_of_maximal_independent_sets(g: nx.Graph):
     return nx.find_cliques(nx.complement(g))
 
 
-def solve_bc(g: nx.Graph):
+def solve_bc(g: nx.Graph, use_relaxation: bool = True):
     # use frozen sets so they are hashable
     indep_sets = frozenset(frozenset(indep_set) for indep_set in get_set_of_maximal_independent_sets(g))
     lb = 1  # independent edges method doesn't work
@@ -44,10 +44,14 @@ def solve_bc(g: nx.Graph):
     m = gp.Model()
     # define variables
     w = m.addVars(indep_sets, bicliques, range(2), vtype=GRB.BINARY, name='w')
-    x = m.addVars(g.nodes, bicliques, range(2), vtype=GRB.CONTINUOUS, lb=0, ub=1, name='x')  # relaxed
-    p = m.addVars(g.nodes, bicliques, range(2), vtype=GRB.CONTINUOUS, lb=0, ub=1, name='p')  # relaxed
-    y = m.addVars(dg.edges, bicliques, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')           # relaxed
-    z = m.addVars(bicliques, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='z')                     # relaxed
+    x = m.addVars(g.nodes, bicliques, range(2),
+                  vtype=GRB.CONTINUOUS if use_relaxation else GRB.INTEGER, lb=0, ub=1, name='x')
+    p = m.addVars(g.nodes, bicliques, range(2),
+                  vtype=GRB.CONTINUOUS if use_relaxation else GRB.INTEGER, lb=0, ub=1, name='p')
+    y = m.addVars(dg.edges, bicliques,
+                  vtype=GRB.CONTINUOUS if use_relaxation else GRB.INTEGER, lb=0, ub=1, name='y')
+    z = m.addVars(bicliques,
+                  vtype=GRB.CONTINUOUS if use_relaxation else GRB.INTEGER, lb=0, ub=1, name='z')
     # objective function
     m.setObjective(gp.quicksum(z), GRB.MINIMIZE)
     # independent set partition constraints
@@ -71,7 +75,8 @@ def solve_bc(g: nx.Graph):
     # symmetry break
     m.addConstrs(z[b + 1] <= z[b] for b in range(ub-1))
     # lower bound
-    m.addConstrs(z[b] == 1 for b in range(lb))
+    for b in range(lb):
+        z[b].lb = 1
 
     m.optimize()
 
@@ -103,7 +108,6 @@ def print_independent_sets(g: nx.Graph, g_name, max_indep_sets: int = None):
 
 
 if __name__ == '__main__':
-    for g, g_name in get_graphs_in_store(fname_regex='simple'):
+    for g, g_name in get_graphs_in_store(fname_regex='partite', max_graphs=1):
         solution = solve_bc(g)
         print(solution)
-
