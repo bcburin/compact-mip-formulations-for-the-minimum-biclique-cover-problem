@@ -9,54 +9,39 @@ from gerrychain import (Graph)
 from src.util import build_graph_from_file
 
 
-# def reorder_heuristic_ind()
-
 def solve_bc(G, form, use_lower=False):
     print("Number of edges: ", len(G.edges))
-    
     print("Number of nodes: ", len(G.nodes))
-       
-    
-    #nx.draw(g)
-    
     # find a vertex cover of g which is an upper bound for the minimum biclique covering problem (MBCP)
     vertex_cover_number, vertex_cover_set = vertex_cover.solve(G)
-    
     # find an independent set of g which is a lower bound for the minimum biclique covering problem (MBCP)
-    #indep_number = independent_set.solve(g)
+    # indep_number = independent_set.solve(g)
     # indep_number = directed_stars.solve(g)
-    
     # print("iuc_number: ", indep_number)
-    if (use_lower):
+    if use_lower:
         indep_edges = edge_indep.solve(G)
     else:
         indep_edges = []
     print("indep_number: ", len(indep_edges))
-    
-    # print("vertex cover number: ", vertex_cover_number)
-#    print("vertex cover set: ", vertex_cover_set)
-#    return
-    
     # find a heuristic solution for the MBCP based on the vertex cover set
     heuristic_sol = heuristic.find_cover(G, vertex_cover_set)
-    
     # print("heuristic solution: ", heuristic_sol)
-    
-    if (form == 1):
+    if form == 1:
         sol = biclique.get_vertex_bc_from_edge(G, heuristic_sol)
         print(sol)
         biclique_cover = biclique.solve_v(G, sol, indep_edges=indep_edges)
         print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
-    elif (form == 2):
+    elif form == 2:
         biclique_cover = biclique.solve(G, heuristic_sol, indep_edges=indep_edges)
         print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
-    elif (form == 3):
-        biclique_cover = biclique.solve_recursive(G, heuristic_sol, indep_edges=indep_edges)
+    elif form == 3:
+        biclique_cover = biclique.solve_recursive(G, heuristic_sol)
         print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
 
 
-def readGraph(level, state, level_name):
-    return Graph.from_json("../data/"+level+"/json/"+state+"_"+level_name+".json")
+def read_graph(level, state, level_name):
+    return Graph.from_json("../data/" + level + "/json/" + state + "_" + level_name + ".json")
+
 
 # read input graph g
 state = "AR"
