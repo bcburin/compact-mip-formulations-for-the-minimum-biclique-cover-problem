@@ -6,7 +6,6 @@ from gurobipy import GRB
 import networkx as nx
 import numpy as np
 import cvxpy as cp
-from pandas import DataFrame
 
 from util import get_graphs_in_store, GraphReport
 
@@ -112,7 +111,7 @@ def compute_lb_by_independent_edges_method(g: nx.Graph | nx.DiGraph) -> int:
             if (not {u, v} & {c, d} and
                     ((g.has_edge(c, u) and g.has_edge(d, v)) or
                      (g.has_edge(c, v) and g.has_edge(d, u)))):
-                m.addConstr(y[(u, v)] + y[(v, u)] + y[(c, d)] + y[(d, c)] <= 1)
+                m.addConstr(y[(u, v)] + y[(v, u)] + y[(c, d)] + y[(d, c)] <= 1, name='c0')
         # set a one-minute time limit
         m.Params.TimeLimit = 60
         # optimize
@@ -181,5 +180,3 @@ if __name__ == "__main__":
         for method in UBComputeMethod:
             report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g)
     report.save_csv()
-
-
