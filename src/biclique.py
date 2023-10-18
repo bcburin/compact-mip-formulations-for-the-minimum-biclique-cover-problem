@@ -213,9 +213,6 @@ def solve_v(G, heuristic_sol, indep_edges=None, maximal_con=False):
         add_maximal_con_v(m, G, DG, Y, k)
     # warm start X vars
     add_initial_v(heuristic_sol, X, Y, Z)
-    # fix z vars
-    for b in range(k):
-        Z[b].lb = 1.0
     fix_indep_edges_v(indep_edges, X, Y)
     # define objective function
     m.setObjective(gp.quicksum(Z), sense=GRB.MINIMIZE)
