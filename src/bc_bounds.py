@@ -143,6 +143,8 @@ def vertex_cover(g: nx.Graph) -> int:
     try:
         # define model
         m = gp.Model()
+        # set params
+        m.Params.LogToConsole = 0
         # define vars
         x = m.addVars(g.nodes, vtype=GRB.BINARY, name="x")
         # define objective function
