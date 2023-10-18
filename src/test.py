@@ -8,7 +8,6 @@ import edge_indep
 from gerrychain import (Graph)
 
 from src.util import build_multipartite_graph, save_graph_in_store, get_graphs_in_store, GraphReport, chronometer
-from src.independent_set import solve_bc as indep_set_solve_bc
 
 
 def solve_bc(G, form, use_lower=False):
@@ -87,28 +86,3 @@ def build_and_save_multipartite_graphs(
         save_graph_in_store(g=g, g_name=g_name)
 
 
-def build_and_save_multipartite_model_comparison_report(max_graphs):
-    # define constant strings
-    report_name = 'multipartite_model_comparison'
-    original_model1 = 'original_model1'
-    original_model2 = 'original_model2'
-    original_model3 = 'original_model3'
-    indep_set_model = 'indep_set_model'
-    # create report
-    report = GraphReport(name=report_name + f'_{max_graphs}' if max_graphs else '')
-    report.add_properties([original_model1, original_model2, original_model3, indep_set_model])
-    for g, g_name in get_graphs_in_store(fname_regex='partite', max_graphs=max_graphs):
-        report.add_graph_data(g, g_name)
-        report.add_property_values_from_function(p_name=original_model1, f=solve_bc, G=g, form=1, use_lower=False)
-        report.add_property_values_from_function(p_name=original_model2, f=solve_bc, G=g, form=2, use_lower=False)
-        report.add_property_values_from_function(p_name=original_model3, f=solve_bc, G=g, form=3, use_lower=False)
-        report.add_property_values_from_function(p_name=indep_set_model, f=indep_set_solve_bc, g=3)
-
-
-if __name__ == "__main__":
-    for g, g_name in get_graphs_in_store(fname_regex='complete-5-multipartite.*', max_graphs=1):
-        print(g_name)
-        _, t1 = chronometer(f=solve_bc, G=g, form=1, use_lower=False)
-        print('t1', t1)
-        _, t2 = chronometer(f=indep_set_solve_bc, g=g)
-        print(t2)
