@@ -13,7 +13,7 @@ from src.independent_set import get_set_of_maximal_independent_sets
 from src.util import get_graphs_in_store, GraphReport
 
 
-def solve_bc_v1(g: nx.Graph, log_gb: TextIO = None, log_res: TextIO = None):
+def solve_bc_v1(g: nx.Graph, log_gb: TextIO = None, log_res: TextIO = None, time_limit: int = None):
     lb = 1
     ub = int(find_bc_upper_bound(g, method=UBComputeMethod.VERTEX))
     dg = nx.DiGraph(g)
@@ -23,6 +23,8 @@ def solve_bc_v1(g: nx.Graph, log_gb: TextIO = None, log_res: TextIO = None):
     # create model
     m = gp.Model()
     # set parameters
+    if time_limit is not None:
+        m.Params.TimeLimit = time_limit
     if log_gb is not None:
         m.Params.LogFile = log_gb.name
         # m.Params.LogToConsole = 0
@@ -53,17 +55,24 @@ def solve_bc_v1(g: nx.Graph, log_gb: TextIO = None, log_res: TextIO = None):
 
     m.optimize()
 
-    # construct dataframe with bicliques
-    df_bicliques = get_biclique_cover_dataframe(g=g, bicliques=bicliques, z=z, y=y)
-    # check solution
-    log_res.write(f'IS BICLIQUE COVER? {"Y" if is_biclique_cover(g, df_bicliques) else "N"}')
-    # save solution
-    log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
+    if m.status == GRB.OPTIMAL:
+        # construct dataframe with bicliques
+        df_bicliques = get_biclique_cover_dataframe(g=g, bicliques=bicliques, z=z, y=y)
+        # check solution
+        log_res.write(f'IS BICLIQUE COVER? {"Y" if is_biclique_cover(g, df_bicliques) else "N"}')
+        # save solution
+        log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
 
-    return m.objVal
+        return m.objVal
+
+    if m.status == GRB.TIME_LIMIT:
+        log_res.write(f'\nMODEL REACHED TIME LIMIT OF {time_limit} SECONDS\n')
+    else:
+        log_res.write(f'\nTHERE WAS AN UNEXPECTED ERROR\n')
 
 
-def solve_bc_v2(g: nx.Graph, use_relaxation: bool = True, log_gb: TextIO = None, log_res: TextIO = None):
+def solve_bc_v2(g: nx.Graph, use_relaxation: bool = True, log_gb: TextIO = None, log_res: TextIO = None,
+                time_limit: int = None):
     # use frozen sets so the independent sets are hashable
     indep_sets = frozenset(frozenset(indep_set) for indep_set in get_set_of_maximal_independent_sets(g))
     lb = 1
@@ -74,6 +83,8 @@ def solve_bc_v2(g: nx.Graph, use_relaxation: bool = True, log_gb: TextIO = None,
     # create model
     m = gp.Model()
     # set parameters
+    if time_limit is not None:
+        m.Params.TimeLimit = time_limit
     if log_gb is not None:
         m.Params.LogFile = log_gb.name
         # m.Params.LogToConsole = 0
@@ -115,14 +126,20 @@ def solve_bc_v2(g: nx.Graph, use_relaxation: bool = True, log_gb: TextIO = None,
 
     m.optimize()
 
-    # construct dataframe with bicliques
-    df_bicliques = get_biclique_cover_dataframe(g=g, bicliques=bicliques, z=z, y=y)
-    # check solution
-    log_res.write(f'\nIS BICLIQUE COVER? {"Y" if is_biclique_cover(g, df_bicliques) else "N"}\n')
-    # save solution
-    log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
+    if m.status == GRB.OPTIMAL:
+        # construct dataframe with bicliques
+        df_bicliques = get_biclique_cover_dataframe(g=g, bicliques=bicliques, z=z, y=y)
+        # check solution
+        log_res.write(f'\nIS BICLIQUE COVER? {"Y" if is_biclique_cover(g, df_bicliques) else "N"}\n')
+        # save solution
+        log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
 
-    return m.objVal
+        return m.objVal
+
+    if m.status == GRB.TIME_LIMIT:
+        log_res.write(f'\nMODEL REACHED TIME LIMIT OF {time_limit} SECONDS\n')
+    else:
+        log_res.write(f'\nTHERE WAS AN UNEXPECTED ERROR\n')
 
 
 def get_biclique_cover_dataframe(g: nx.Graph, bicliques: Iterable, z: gp.Var, y: gp.Var) -> pd.DataFrame:
@@ -208,10 +225,10 @@ def create_and_save_model_comparison_report(report_name: str, **kwargs):
         report.add_graph_data(g, g_name)
         write_header(log=log_res_v1, g=g, g_name=g_name)
         report.add_property_values_from_function(
-            p_name=model_v1, f=solve_bc_v1, g=g, log_gb=log_gb_v1, log_res=log_res_v1)
+            p_name=model_v1, f=solve_bc_v1, g=g, log_gb=log_gb_v1, log_res=log_res_v1, time_limit=120)
         write_header(log=log_res_v2, g=g, g_name=g_name)
         report.add_property_values_from_function(
-            p_name=model_v2, f=solve_bc_v2, g=g, log_gb=log_gb_v2, log_res=log_res_v2)
+            p_name=model_v2, f=solve_bc_v2, g=g, log_gb=log_gb_v2, log_res=log_res_v2, time_limit=120)
     # save report
     report.save_csv()
     # close files
@@ -223,4 +240,4 @@ def create_and_save_model_comparison_report(report_name: str, **kwargs):
 
 if __name__ == '__main__':
     create_and_save_model_comparison_report(
-        report_name='complete-5-multipartite-comparison', fname_regex='complete-5-multipartite', max_edges=350)
+        report_name='complete-multipartite-comparison', fname_regex='complete.*partite')
