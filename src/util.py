@@ -13,15 +13,36 @@ from pandas import DataFrame
 ReturnType = TypeVar('ReturnType')
 
 
-def get_file_extension(fname: str) -> str:
-    return fname.split(sep='.')[-1]
+def get_file_name_and_extension(fname: str) -> tuple[str, str | None]:
+    """
+    This function separates a file name from the extension. For this, the first "." the file name is
+    considered for separating the two parts. If there is no ".", `None` is returned as the extension.
+
+    :param fname: name of the file
+    :return: a tuple containing the file name without the extension and the file extension itself.
+    """
+    if '.' not in fname:
+        return fname, None
+    name, ext = fname.split(sep='.', maxsplit=1)
+    return name, ext
 
 
-def build_graph_from_file(fpath: str):
+def build_graph_from_file(fpath: str) -> nx.Graph:
+    """
+    This function builds a networkx.Graph object from a file.
+
+    Supported file types: GML, TXT.
+
+    :param fpath: path of the input file.
+    :return: networkx.Graph object built from data in input graph.
+    :raises ValueError: if the provided path is not a file, contains an unsupported file type, or doesn't
+                        contain any file extension at all.
+    """
+
     if not path.isfile(fpath):
         raise ValueError('Invalid fpath parameter. Must be the path of the file.')
     fname = path.basename(fpath)
-    ext = get_file_extension(fname)
+    _, ext = get_file_name_and_extension(fname)
     if ext == 'gml':
         g = nx.read_gml(fpath, label='id')
     elif ext == 'txt':
@@ -36,6 +57,8 @@ def build_graph_from_file(fpath: str):
                 edges.append(edge)
         g = nx.Graph()
         g.add_edges_from(edges)
+    elif ext is None:
+        raise ValueError(f"No file extension provided, unsure of how to build graph.")
     else:
         raise ValueError(f"File extension {ext} not supported, unsure of how to build graph.")
     return g
@@ -47,7 +70,8 @@ def get_graphs_in_store(
         max_graphs: int = None,
         fname_regex: str = None,
         graph_dir: str = None,
-        recursive: bool = False) -> Iterable[tuple[Graph, str]]:
+        recursive: bool = False,
+        include_extension: bool = False) -> Iterable[tuple[Graph, str]]:
     """
     This function reads the contents of the "graph" directory and returns an iterable of graphs built from it.
 
@@ -64,6 +88,7 @@ def get_graphs_in_store(
     :param recursive: boolean flag. If activated, graphs are also searched in subfolders of the graph directory,
                       constrained by the same filters imposed by the other parameters. Otherwise, non-file paths
                       are ignored. By default, it is false.
+    :param include_extension: include file extension in graph name
     :return: iterable containing tuples with the networkx.Graph object and the name of the graph file.
     """
 
@@ -95,7 +120,8 @@ def get_graphs_in_store(
         if max_edges and len(g.edges) > max_edges:
             continue
         count += 1
-        yield g, filename
+        name = filename if include_extension else get_file_name_and_extension(fname=filename)[0]
+        yield g, name
 
 
 def save_graph_in_store(
