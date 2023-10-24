@@ -109,6 +109,7 @@ def get_graphs_in_store(
                                               max_graphs=max_graphs-count,
                                               fname_regex=fname_regex,
                                               graph_dir=filepath,
+                                              include_extension=include_extension,
                                               recursive=True)
                 for sub_g, sub_name in sub_seq:
                     yield sub_g, sub_name
