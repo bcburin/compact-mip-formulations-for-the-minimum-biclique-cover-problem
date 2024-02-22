@@ -1,6 +1,7 @@
 from datetime import datetime
 from os import path, getcwd, pardir, mkdir
 from typing import Type
+from itertools import combinations
 
 import gurobipy as gp
 import networkx as nx
@@ -11,12 +12,6 @@ from src.util import get_graphs_in_store, GraphReport
 
 
 class ModelV1(MBCModel):
-
-    def _add_variables(self):
-        self.z = self.m.addVars(self.bicliques, vtype=GRB.BINARY, name="z")
-        self.x = self.m.addVars(self.g.nodes, self.bicliques, range(2), vtype=GRB.BINARY, name="x")
-        self.y = self.m.addVars(
-            self.directed.edges, self.bicliques, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="y")
 
     def _add_constraints(self):
         # set aliases
@@ -41,6 +36,12 @@ class ModelV1(MBCModel):
             m.addConstrs(y[u, v, b] >= x[u, b, 0] + x[v, b, 1] - z[b] for b in bicliques)
         for u, v in self.directed_complement.edges:
             m.addConstrs(x[u, b, 0] + x[v, b, 1] <= z[b] for b in bicliques)
+
+    def _add_variables(self):
+        self.z = self.m.addVars(self.bicliques, vtype=GRB.BINARY, name="z")
+        self.x = self.m.addVars(self.g.nodes, self.bicliques, range(2), vtype=GRB.BINARY, name="x")
+        self.y = self.m.addVars(
+            self.directed.edges, self.bicliques, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="y")
 
     def _set_objective(self):
         self.m.setObjective(gp.quicksum(self.z), sense=GRB.MINIMIZE)
@@ -167,7 +168,78 @@ class ModelV21(MBCModel, IndepSetProvider):
         return 'v2-1'
 
 
-def create_and_save_model_comparison_report(report_name: str, model_clss: list[Type[MBCModel]], **kwargs):
+class ModelV22(MBCModel, IndepSetProvider):
+
+    @property
+    def node_pairs(self):
+        return combinations(self.g.nodes, r=2)
+
+    def _add_variables(self):
+        bicliques = self.bicliques
+
+        self.w = self.m.addVars(self.indep_sets, bicliques, range(2), vtype=GRB.BINARY, name='w')
+        self.x = self.m.addVars(self.g.nodes, bicliques, range(2), vtype=GRB.CONTINUOUS, lb=0, ub=1, name='x')
+        # self.y = self.m.addVars(self.g.edges, bicliques, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')
+        self.y = self.m.addVars(self.node_pairs, bicliques, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')
+        self.z = self.m.addVars(bicliques, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='z')
+
+        self.y_is_directed = False
+
+    def _add_constraints(self):
+        # set aliases
+        g = self.g
+        m = self.m
+        w = self.w
+        x = self.x
+        y = self.y
+        z = self.z
+        bicliques = self.bicliques
+
+        # independent set partition constraints
+        m.addConstrs(w[s, b, 0] + w[s, b, 1] <= 1 for s in self.indep_sets for b in bicliques)
+        m.addConstrs(w[s, b, d] <= x[u, b, d]
+                     for s in self.indep_sets for u in s for b in bicliques for d in range(2))
+        m.addConstrs(x[u, b, d] <= gp.quicksum(w[s, b, d] for s in self.indep_sets if u in s)
+                     for u in g.nodes for b in bicliques for d in range(2))
+        # PORTA constraints
+        # if y, then x's
+        m.addConstrs(y[u, v, b] <= x[u, b, 0] + x[u, b, 1] for u, v in self.node_pairs for b in bicliques)
+        m.addConstrs(y[u, v, b] <= x[v, b, 0] + x[v, b, 1] for u, v in self.node_pairs for b in bicliques)
+        m.addConstrs(y[u, v, b] <= x[u, b, d] + x[v, b, d]
+                     for u, v in self.node_pairs for b in bicliques for d in range(2))
+        # if R/L and edge, then L/R
+        m.addConstrs(x[u, b, d] + y[u, v, b] <= 1 + x[v, b, 1-d]
+                     for u, v in self.node_pairs for b in bicliques for d in range(2))
+        m.addConstrs(x[v, b, d] + y[u, v, b] <= 1 + x[u, b, 1-d]
+                     for u, v in self.node_pairs for b in bicliques for d in range(2))
+        #
+        m.addConstrs(x[u, b, d] + x[v, b, 1-d] <= 1 + x[u, b, 1-d] + x[v, b, d] + y[u, v, b]
+                     for u, v in self.node_pairs for b in bicliques for d in range(2))
+        # conflict constraints
+        m.addConstrs(x[u, b, d] + x[v, b, d] + y[u, v, b] <= 2
+                     for u, v in self.node_pairs for b in bicliques for d in range(2))
+        m.addConstrs(x[u, b, 0] + x[u, b, 1] + y[u, v, b] <= 2 for u, v in self.node_pairs for b in bicliques)
+        m.addConstrs(x[v, b, 0] + x[v, b, 1] + y[u, v, b] <= 2 for u, v in self.node_pairs for b in bicliques)
+        # cover constraints
+        m.addConstrs(gp.quicksum(y[u, v, b] for b in bicliques) >= 1 for u, v in self.g.edges)
+        m.addConstrs(gp.quicksum(y[u, v, b] for b in bicliques) == 0 for u, v in self.complement.edges)
+        m.addConstrs(y[u, v, b] <= z[b] for u, v in g.edges for b in bicliques)
+        # m.addConstrs(x[u, b, d] + x[v, b, 1 - d] <= 1
+        #              for u, v in self.complement.edges for b in bicliques for d in range(2))
+        # symmetry break
+        m.addConstrs(z[b + 1] <= z[b] for b in range(self.upper_bound - 1))
+
+    def _set_objective(self):
+        self.m.setObjective(gp.quicksum(self.z), sense=GRB.MINIMIZE)
+
+    @classmethod
+    def name(cls) -> str:
+        return 'v2-2'
+
+
+def create_and_save_model_comparison_report(
+        report_name: str, model_clss: list[Type[MBCModel]], time_limit: int = None,
+        suppress_ts_in_report_name: bool = True, **kwargs):
     # get log directory
     dir_parent = path.abspath(path.join(getcwd(), pardir))
     dir_logs = path.join(dir_parent, 'logs')
@@ -178,12 +250,13 @@ def create_and_save_model_comparison_report(report_name: str, model_clss: list[T
     mkdir(dir_ts_logs)
 
     # create report
+    report_name = report_name if suppress_ts_in_report_name else report_name + '-' + str(ts)
     report = GraphReport(name=report_name)
     report.add_properties([model_cls.name() for model_cls in model_clss])
     for g, g_name in get_graphs_in_store(**kwargs):
         report.add_graph_data(g, g_name)
         for model_cls in model_clss:
-            model = model_cls(g=g, g_name=g_name, dir_logs=dir_ts_logs)
+            model = model_cls(g=g, g_name=g_name, dir_logs=dir_ts_logs, time_limit=time_limit)
             report.add_property_values_from_function(p_name=model_cls.name(), f=model.solve)
     # save report
     report.save_csv()
@@ -191,4 +264,9 @@ def create_and_save_model_comparison_report(report_name: str, model_clss: list[T
 
 if __name__ == '__main__':
     create_and_save_model_comparison_report(
-        report_name='simple', fname_regex='simple', model_clss=[ModelV1, ModelV2])
+        report_name='from_indep_sets',
+        model_clss=[ModelV1, ModelV2, ModelV22],
+        fname_regex='from_indep_sets_[3478(10)(12)].*', max_edges=800,
+        time_limit=100,
+        suppress_ts_in_report_name=False,
+    )
