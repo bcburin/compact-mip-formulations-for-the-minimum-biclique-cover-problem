@@ -22,6 +22,7 @@ class MBCModel(ABC):
              lb_method: LBComputeMethod | None = None,
              ub_method: UBComputeMethod = UBComputeMethod.VERTEX,
              time_limit: int = None,
+             recursive_solution: bool = False,
              log_to_console: bool = True,
              dir_logs: str = None):
         self.g = g
@@ -31,6 +32,8 @@ class MBCModel(ABC):
         self._logging = bool(dir_logs)
         self.time_limit = time_limit
         self.log_to_console = log_to_console
+        self.y_is_directed = True
+        self._is_recursive_solution = recursive_solution
         # model
         self.m = gp.Model()
         self._add_variables()
@@ -46,6 +49,9 @@ class MBCModel(ABC):
         self._set_parameters()
         # initial state
         self._solved = False
+
+    def __del__(self):
+        self._close_files()
 
     def _close_files(self):
         if self._logging:
@@ -99,12 +105,12 @@ class MBCModel(ABC):
             self.log_res.write(f'IS BICLIQUE COVER? {"Y" if self.is_biclique_cover(df_bicliques) else "N"}')
             # save solution
             self.log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
-            self.log_grb.close()
-            self.log_res.close()
         elif self.m.status == GRB.TIME_LIMIT:
             self.log_res.write(f'\nMODEL REACHED TIME LIMIT OF {self.time_limit} SECONDS\n\n')
+        elif self.m.status == GRB.INFEASIBLE:
+            self.log_res.write('\nMODEL HAS BEEN MARKED AS UNFEASIBLE\n\n')
         else:
-            self.log_res.write(f'\nTHERE WAS AN UNEXPECTED ERROR\n\n')
+            self.log_res.write(f'\nSTATUS CODE: {self.m.status}\n\n')
         self._close_files()
 
     @cache
@@ -112,7 +118,7 @@ class MBCModel(ABC):
         """
         This method builds a Pandas dataframe containing the solution of a biclique cover. For this to work for
         a model, it is enough that said model define z variables representing bicliques and y variables representing
-        whether an arc belongs to a biclique.
+        whether an arc or edge belongs to a biclique.
 
         :return: a binary dataframe, where each column is a biclique and each line is indexed by a node. Each cell can
                  hold the values 0, 1, or 2. If the node does not belong to the biclique, the value is zero. If the node
@@ -125,18 +131,28 @@ class MBCModel(ABC):
         if not hasattr(self, 'z') or not hasattr(self, 'y'):
             raise RuntimeError('Model does not define z or y variables. They are required to build the '
                                'biclique dataframe.')
+        if not hasattr(self, 'x') and not self.y_is_directed:
+            raise RuntimeError('Variable x is required for models with undirected y variable.')
 
         df_bicliques = DataFrame(
             {b: [0] * len(self.g.nodes) for b in self.bicliques if self.z[b].X == 1}, index=[u for u in self.g.nodes])
-        for e in self.g.edges:
-            u, v = e
-            for b in self.bicliques:
-                if self.z[b].X == 1:
-                    if self.y[u, v, b].X == 1:
+        if self.y_is_directed:
+            for e in self.g.edges:
+                u, v = e
+                for b in self.bicliques:
+                    if self.z[b].X == 1:
+                        if self.y[u, v, b].X == 1:
+                            df_bicliques.loc[u, b] = 1
+                            df_bicliques.loc[v, b] = 2
+                        if self.y[v, u, b].X == 1:
+                            df_bicliques.loc[v, b] = 1
+                            df_bicliques.loc[u, b] = 2
+        else:
+            for u in self.g.nodes:
+                for b in self.bicliques:
+                    if self.x[u, b, 0].X == 1 and self.x[u, b, 1].X == 0:
                         df_bicliques.loc[u, b] = 1
-                        df_bicliques.loc[v, b] = 2
-                    if self.y[v, u, b].X == 1:
-                        df_bicliques.loc[v, b] = 1
+                    if self.x[u, b, 0].X == 0 and self.x[u, b, 1].X == 1:
                         df_bicliques.loc[u, b] = 2
         return df_bicliques
 
@@ -195,9 +211,12 @@ class MBCModel(ABC):
         # optimization process
         self.m.optimize()
         self._solved = True
+
         # custom post-solve with default implementation
         self._post_solve()
         # return obj val
+        if self.m.status != GRB.OPTIMAL:
+            return None
         return self.m.objVal
 
 
