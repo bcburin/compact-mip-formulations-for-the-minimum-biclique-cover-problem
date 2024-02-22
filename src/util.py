@@ -219,6 +219,25 @@ def chronometer(f: Callable[..., ReturnType], *args, **kwargs) -> tuple[ReturnTy
     return val, time() - start_time
 
 
+def poisson(x: float, x_0: float, mu: float):
+    if mu < 0:
+        raise ValueError('The parameter mu must be a positive real number.')
+    x = x - x_0
+    ln_res = -mu + x * math.log(mu) - math.log(math.factorial(math.floor(x)))
+    return math.exp(ln_res)
+
+
+def get_logs_directory(name: str):
+    dir_parent = path.abspath(path.join(getcwd(), pardir))
+    dir_logs = path.join(dir_parent, 'logs')
+    if not path.isdir(dir_logs):
+        mkdir(dir_logs)
+    ts = int(datetime.now().timestamp())
+    dir_ts_logs = path.join(dir_logs, name + '-' + str(ts))
+    mkdir(dir_ts_logs)
+    return dir_ts_logs
+
+
 class GraphReport:
     """
     A class for automatically generating and saving reports about graphs based on user-defined properties and their
