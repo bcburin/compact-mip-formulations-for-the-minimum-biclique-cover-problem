@@ -6,6 +6,9 @@ import time
 import networkx as nx
 from itertools import combinations
 
+import heuristic
+import vertex_cover
+
 
 def get_v_bicliques(G, X, k):
     bicliques = []
@@ -135,9 +138,14 @@ def solve_recursive(G, indep_edges=None, maximal_con=True):
 
         if m.status == GRB.OPTIMAL:
             print("Total time: ", time.time() - start)
-            return get_v_bicliques(G, X, k)
+            return m.objVal, get_v_bicliques(G, X, k)
         else:
             k += 1
+
+
+def find_heuristic_solution(g: nx.Graph):
+    vertex_cover_number, vertex_cover_set = vertex_cover.solve(g)
+    return heuristic.find_cover(g, vertex_cover_set)
 
 
 def add_maximal_con_v(m, G, DG, Y, k):
