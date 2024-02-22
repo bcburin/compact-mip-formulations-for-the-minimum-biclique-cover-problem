@@ -1,3 +1,5 @@
+import math
+from datetime import datetime
 from os import path, listdir, getcwd, pardir, mkdir, remove
 from itertools import combinations, product
 from random import random
@@ -328,16 +330,20 @@ class GraphReport:
         self._data[f'{p_name}_time'].append(p_time)
         self._props[p_name] = True
 
-    def add_property_values_from_function(self, p_name: str, f: Callable[..., ReturnType], *args, **kwargs):
+    def add_property_values_from_function(
+            self, p_name: str, f: Callable[..., ReturnType],  apply: Callable = None, *args, **kwargs):
         """
         Add property values to the report using a function.
 
+        :param apply: apply to result of callable function before adding to report.
         :param p_name: The name of the property.
         :param f: The function to calculate the property.
         :param args: Non-keyword arguments for the function.
         :param kwargs: Keyword arguments for the function.
         """
         p_value, p_time = chronometer(f=f, *args, **kwargs)
+        if apply:
+            p_value = apply(p_value)
         self.add_property_values(p_name=p_name, p_value=p_value, p_time=p_time)
 
     def get_report_data(self, **kwargs) -> DataFrame:
