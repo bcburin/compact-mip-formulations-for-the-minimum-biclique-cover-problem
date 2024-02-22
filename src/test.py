@@ -36,7 +36,7 @@ def solve_bc(G, form, use_lower=False):
         biclique_cover = biclique.solve(G, heuristic_sol, indep_edges=indep_edges)
         print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
     elif form == 3:
-        biclique_cover = biclique.solve_recursive(G, heuristic_sol)
+        _, biclique_cover = biclique.solve_recursive(G, heuristic_sol)
         print("Is it biclique cover? ", biclique.check_v_biclique_cover(G, biclique_cover))
 
 
@@ -85,4 +85,28 @@ def build_and_save_multipartite_graphs(
         # save graph
         save_graph_in_store(g=g, g_name=g_name)
 
+
+if __name__ == '__main__':
+    # imports
+    from model import ModelV1
+    from util import get_logs_directory
+    from biclique import solve_recursive, find_heuristic_solution
+    # constants
+    v1 = 'v1_recursive'
+    v2 = 'v2'
+    report_name = 'comparison'
+    dir_ts_logs = get_logs_directory(name=report_name)
+    time_limit = 100
+    # create report
+    report = GraphReport(name=report_name)
+    report.add_properties([v1, v2])
+    for g, g_name in get_graphs_in_store(fname_regex='from_indep_set.*', max_edges=290):
+        print('-' * 80, '\n', g_name)
+        # heuristic = find_heuristic_solution(g)
+        report.add_graph_data(g, g_name)
+        m2 = ModelV1(g=g, g_name=g_name, dir_logs=dir_ts_logs, time_limit=40)
+        report.add_property_values_from_function(p_name=v2, f=m2.solve)
+        report.add_property_values_from_function(p_name=v1, f=solve_recursive, G=g, apply=lambda x: x[0])
+    # save report
+    report.save_csv()
 
