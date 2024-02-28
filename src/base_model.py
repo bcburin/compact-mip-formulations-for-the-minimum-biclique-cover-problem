@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cache
+from itertools import combinations
+
 from os import path
 from typing import TextIO, Iterable
 
@@ -205,6 +207,25 @@ class MBCModel(ABC):
     def bicliques(self) -> Iterable:
         return range(self.upper_bound)
 
+    @cache
+    def get_disjoint_edges(self) -> set[tuple[int, int, int, int]]:
+        disjoint_edges = set()
+        for e, f in combinations(self.g.edges, r=2):
+            a, b = e
+            c, d = f
+            if {a, b}.isdisjoint({c, d}):
+                cr1, cr2 = 0, 0
+                if self.g.has_edge(a, d):
+                    cr1 += 1
+                if self.g.has_edge(c, b):
+                    cr1 += 1
+                if self.g.has_edge(a, c):
+                    cr2 += 1
+                if self.g.has_edge(b, d):
+                    cr2 += 1
+                disjoint_edges.add((e, f, cr1, cr2))
+        return disjoint_edges
+
     def solve(self):
         # custom pre-solve
         self._pre_solve()
@@ -218,14 +239,3 @@ class MBCModel(ABC):
         if self.m.status != GRB.OPTIMAL:
             return None
         return self.m.objVal
-
-
-class IndepSetProvider:
-
-    def __init__(self, g: nx.Graph):
-        self.g = g
-
-    @property
-    @cache
-    def indep_sets(self) -> frozenset[frozenset[int]]:
-        return frozenset(frozenset(indep_set) for indep_set in get_set_of_maximal_independent_sets(self.g))
