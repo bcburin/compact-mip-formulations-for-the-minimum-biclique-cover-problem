@@ -1,0 +1,14 @@
+[
+  {
+    "graph": "simple_5_7.gml",
+    "model": "NaturalModel"
+  },
+  {
+    "graph": "simple_5_7.gml",
+    "model": "ExtendedModel"
+  },
+  {
+    "graph": "ieee30.txt",
+    "model": "NaturalModel"
+  }
+]
