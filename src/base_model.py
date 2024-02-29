@@ -87,6 +87,10 @@ class MBCModel(ABC):
     def _set_objective(self):
         ...
 
+    @abstractmethod
+    def _check_biclique_cover(self) -> bool:
+        ...
+
     @classmethod
     @abstractmethod
     def name(cls) -> str:
@@ -103,13 +107,8 @@ class MBCModel(ABC):
         if not self._logging:
             return
         if self.m.status == GRB.OPTIMAL:
-            pass
-            # construct dataframe with bicliques
-            # df_bicliques = self.get_bicliques()
             # check solution
-            # self.log_res.write(f'IS BICLIQUE COVER? {"Y" if self._is_biclique_cover(df_bicliques) else "N"}')
-            # save solution
-            # self.log_res.write(f'\nBICLIQUE COVER DATAFRAME:\n{df_bicliques}\n\n')
+            self.log_res.write(f'IS BICLIQUE COVER? {"Y" if self._check_biclique_cover() else "N"}')
         elif self.m.status == GRB.TIME_LIMIT:
             self.log_res.write(f'\nMODEL REACHED TIME LIMIT OF {self.time_limit} SECONDS\n\n')
         elif self.m.status == GRB.INFEASIBLE:

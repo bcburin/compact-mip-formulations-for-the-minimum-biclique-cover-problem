@@ -5,15 +5,7 @@ import networkx as nx
 from gurobipy import GRB
 
 from src.base_model import MBCModel
-
-
-def var_swap(x, u, v, i):
-    """
-    This function gets the value of x[e, i] for e=[u, v] when the order of the vertices in the graph
-    definition is unknown.
-    """
-    # the nested gets are for when x[u, v, i] doesn't exist, but x[v, u, i] does
-    return x.get((u, v, i), x.get((v, u, i)))
+from src.util import is_biclique, var_swap
 
 
 class NaturalModel(MBCModel):
@@ -68,6 +60,19 @@ class NaturalModel(MBCModel):
         # 4i
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
 
+    def _check_biclique_cover(self) -> bool:
+        # check it's a cover
+        if not any(self.x[u, v, i].X == 1 for u, v in self.g.edges for i in self.bicliques):
+            return False
+        # check it's a biclique cover
+        for i in self.bicliques:
+            if self.z[i].X != 1:
+                continue
+            edges = [(u, v) for u, v in self.g.edges if self.x[u, v, i].X == 1]
+            if not is_biclique(graph=self.g, edges=edges):
+                return False
+        return True
+
     @classmethod
     def name(cls) -> str:
         return 'Compact Natural Model'
@@ -107,6 +112,20 @@ class ExtendedModel(MBCModel):
             m.addConstrs(y[v, i, 0] + y[u, i, 1] <= z[i] for i in self.bicliques)
         # 5g
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+
+    def _check_biclique_cover(self) -> bool:
+        # check it's a cover
+        if not any(self.x[u, v, i].X == 1 or self.x[v, u, i].X == 1
+                   for u, v in self.g.edges for i in self.bicliques):
+            return False
+        # check it's a biclique cover
+        for i in self.bicliques:
+            if self.z[i].X != 1:
+                continue
+            edges = [(u, v) for u, v in self.g.edges if self.x[u, v, i].X == 1 or self.x[v, u, i].X == 1]
+            if not is_biclique(graph=self.g, edges=edges):
+                return False
+        return True
 
     @classmethod
     def name(cls) -> str:

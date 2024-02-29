@@ -309,6 +309,23 @@ def read_run_config_file(config_file_path: str) -> list[RunConfig]:
             print(error['msg'])
 
 
+def is_biclique(graph: Graph, edges: list):
+    # Create a subgraph induced by the given set of edges
+    subgraph = graph.edge_subgraph(edges)
+
+    # Check if the induced subgraph is bipartite
+    if not nx.is_bipartite(subgraph):
+        return False
+
+    # Check if every node in one set is connected to every node in the other set
+    set1, set2 = nx.bipartite.sets(subgraph)
+    for u in set1:
+        for v in set2:
+            if (u, v) not in subgraph.edges:
+                return False
+    return True
+
+
 class GraphReport:
     """
     A class for automatically generating and saving reports about graphs based on user-defined properties and their
@@ -466,3 +483,12 @@ simple_5_7.gml
                 save_path = path.join(save_dir, report_name + f'-{count}.csv')
                 count += 1
         df_data.to_csv(save_path, index=False, **kwargs)
+
+
+def var_swap(x, u, v, i):
+    """
+    This function gets the value of x[e, i] for e=[u, v] when the order of the vertices in the graph
+    definition is unknown.
+    """
+    # the nested gets are for when x[u, v, i] doesn't exist, but x[v, u, i] does
+    return x.get((u, v, i), x.get((v, u, i)))
