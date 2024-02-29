@@ -43,7 +43,7 @@ def build_graph_from_file(fpath: str) -> nx.Graph:
     """
 
     if not path.isfile(fpath):
-        raise ValueError('Invalid fpath parameter. Must be the path of the file.')
+        raise ValueError(f'Invalid fpath parameter <{fpath}>. Must be the path of the file.')
     fname = path.basename(fpath)
     _, ext = get_file_name_and_extension(fname)
     if ext == 'gml':
@@ -96,7 +96,8 @@ def get_graphs_in_store(
     """
 
     if not graph_dir:
-        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        current_dir = path.dirname(path.abspath(__file__))
+        parent_dir = path.abspath(path.join(current_dir, pardir))
         graph_dir = path.join(parent_dir, 'graph')
     count = 0
     for filename in listdir(graph_dir):
@@ -130,7 +131,8 @@ def get_graphs_in_store(
 
 def get_graph_in_store(filename: str, graph_dir: str = None) -> Graph:
     if not graph_dir:
-        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        current_dir = path.dirname(path.abspath(__file__))
+        parent_dir = path.abspath(path.join(current_dir, pardir))
         graph_dir = path.join(parent_dir, 'graph')
     filepath = path.join(graph_dir, filename)
     g = build_graph_from_file(fpath=filepath)
@@ -162,7 +164,8 @@ def save_graph_in_store(
     """
 
     if not graph_dir:
-        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        current_dir = path.dirname(path.abspath(__file__))
+        parent_dir = path.abspath(path.join(current_dir, pardir))
         graph_dir = path.join(parent_dir, 'graph')
     if not path.isdir(graph_dir) and create_dir:
         mkdir(graph_dir)
