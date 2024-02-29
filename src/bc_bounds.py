@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 import cvxpy as cp
 
-from util import get_graphs_in_store, GraphReport
+from src.util import get_graphs_in_store, GraphReport
 
 
 class LBComputeMethod(Enum):

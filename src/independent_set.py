@@ -5,7 +5,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import networkx as nx
 
-from util import chronometer, poisson, save_graph_in_store
+from src.util import chronometer, poisson, save_graph_in_store
 
 
 def solve(g):

@@ -4,7 +4,7 @@ from os import path, getcwd, pardir, mkdir
 
 from src.util import GraphReport, read_run_config_file, RunConfig, get_graph_in_store, \
     get_file_name_and_extension, chronometer
-import model as model_classes
+import src.model as model_classes
 
 
 def create_and_save_model_comparison_report(
