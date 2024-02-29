@@ -1,8 +1,9 @@
+import json
 import math
 from datetime import datetime
 from os import path, listdir, getcwd, pardir, mkdir, remove
 from itertools import combinations, product
-from random import random
+from random import random, randint
 from re import match
 from time import time
 from typing import Callable, TypeVar, Iterable
@@ -10,7 +11,7 @@ from typing import Callable, TypeVar, Iterable
 import networkx as nx
 from networkx import Graph
 from pandas import DataFrame
-
+from pydantic import BaseModel, ValidationError, parse_obj_as
 
 ReturnType = TypeVar('ReturnType')
 
@@ -127,6 +128,15 @@ def get_graphs_in_store(
         yield g, name
 
 
+def get_graph_in_store(filename: str, graph_dir: str = None) -> Graph:
+    if not graph_dir:
+        parent_dir = path.abspath(path.join(getcwd(), pardir))
+        graph_dir = path.join(parent_dir, 'graph')
+    filepath = path.join(graph_dir, filename)
+    g = build_graph_from_file(fpath=filepath)
+    return g
+
+
 def save_graph_in_store(
         g: Graph,
         g_name: str,
@@ -209,6 +219,48 @@ def build_multipartite_graph(*partition_sizes: int, edge_probability: float = 1.
     return g
 
 
+def build_and_save_multipartite_graphs(
+        min_partitions: int,
+        max_partitions: int,
+        number_each_partition: int,
+        min_vertices: int = 3,
+        max_vertices: int = 10,
+        edge_probability: float = 1.0):
+    """
+    This function generates and saves multipartite graphs with specified parameters.
+
+    :param min_partitions: Smallest number of partitions in the generated graphs. (Inclusive)
+    :param max_partitions: Largest number of partitions in the generated graphs. (Exclusive)
+    :param number_each_partition: Number of graphs to create for each partition count.
+    :param min_vertices: Minimum number of vertices in the partitions.
+    :param max_vertices: Maximum number of vertices in the partitions.
+    :param edge_probability: Probability of edge existence in the graphs (1.0 for complete graphs).
+
+    The function generates multipartite graphs with a variable number of partitions, each with a random number of
+    vertices within the specified range. It saves the generated graphs with descriptive names based on their properties.
+
+    The naming format for the saved graphs includes the edge probability, the type of multipartite graph (bipartite,
+    tripartite, or n-multipartite), and the sizes of the partitions.
+
+    The generated graphs are saved using the `save_graph_in_store` function.
+
+    No return value; the graphs are saved in the specified directory.
+    """
+
+    number_diff_partitions = max_partitions - min_partitions
+    for i in range(number_diff_partitions * number_each_partition):
+        # construct graph
+        n = min_partitions + i % number_each_partition  # number of partitions in the graph
+        sizes = [randint(min_vertices, max_vertices) for _ in range(n)]
+        g = build_multipartite_graph(*sizes, edge_probability=edge_probability)
+        # construct graph name
+        str_partition_type = 'bipartite' if n == 2 else 'tripartite' if n == 3 else f'{n}-multipartite'
+        str_edge_probability = 'complete' if edge_probability == 1 else f'{int(edge_probability * 100)}'
+        g_name = f'{str_edge_probability}-{str_partition_type}' + ''.join(f'_{size}' for size in sizes)
+        # save graph
+        save_graph_in_store(g=g, g_name=g_name)
+
+
 def chronometer(f: Callable[..., ReturnType], *args, **kwargs) -> tuple[ReturnType, float]:
     """
     :param f: function whose execution time will be measured.
@@ -240,6 +292,23 @@ def get_logs_directory(name: str):
     return dir_ts_logs
 
 
+class RunConfig(BaseModel):
+    graph: str
+    model: str
+
+
+def read_run_config_file(config_file_path: str) -> list[RunConfig]:
+    with open(config_file_path, 'r') as config_file:
+        run_config_data = json.load(config_file)
+
+    try:
+        run_configs = parse_obj_as(list[RunConfig], run_config_data)
+        return run_configs
+    except ValidationError as e:
+        for error in e.errors():
+            print(error['msg'])
+
+
 class GraphReport:
     """
     A class for automatically generating and saving reports about graphs based on user-defined properties and their
@@ -256,38 +325,39 @@ class GraphReport:
         self._props = {}
         self._finished_setup = False
 
-    def _add_property(self, p_name: str):
+    def _add_property(self, p_name: str, add_time_property: bool):
         if p_name in self._props:
             return
         self._data[p_name] = []
-        self._data[f'{p_name}_time'] = []
+        if add_time_property:
+            self._data[f'{p_name}_time'] = []
         self._props[p_name] = False
         self._rows = 0
 
-    def add_property(self, p_name: str):
+    def add_property(self, p_name: str, add_time_property: bool = False):
         """
-        Add a graph property to the report. Automatically adds the corresponding calculation time property. Repeated
-        properties are ignored.
+        Add a graph property to the report. Repeated properties are ignored.
 
         :param p_name: The name of the property to add.
+        :param add_time_property: Automatically adds the corresponding calculation time property.
         :raises RuntimeError: If property definition phase has already ended.
         """
         if self._finished_setup:
             raise RuntimeError('Property definition phase already ended.')
-        self._add_property(p_name)
+        self._add_property(p_name, add_time_property)
 
     def add_properties(self, props: list[str]):
         """
         Add multiple properties to the report. Automatically adds the corresponding calculation time property for
         each property added. Repeated properties are ignored.
-
+simple_5_7.gml
         :param props: A list of property names to add.
         :raises RuntimeError: If property definition phase has already ended.
         """
         if self._finished_setup:
             raise RuntimeError('Property definition phase already ended.')
         for prop in props:
-            self._add_property(prop)
+            self._add_property(prop, False)
 
     def _reset_props(self):
         for p_name in self._props.keys():
@@ -313,7 +383,7 @@ class GraphReport:
         self._data['n_nodes'].append(len(g.nodes))
         self._data['n_edges'].append(len(g.edges))
 
-    def add_property_values(self, p_name: str, p_value, p_time):
+    def add_property_values(self, p_name: str, p_value, p_time=None):
         """
         Add property values to the report.
 
@@ -327,7 +397,10 @@ class GraphReport:
         if p_name not in self._data.keys():
             raise ValueError(f'Property {p_name} not defined.')
         self._data[p_name].append(p_value)
-        self._data[f'{p_name}_time'].append(p_time)
+        if p_time is not None:
+            self._data[f'{p_name}_time'].append(p_time)
+        if p_time is None and f'{p_name}_time' in self._props:
+            raise ValueError(f'Property {p_name} requires corresponding time {p_name}_time.')
         self._props[p_name] = True
 
     def add_property_values_from_function(

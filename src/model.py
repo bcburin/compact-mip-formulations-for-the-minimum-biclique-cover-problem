@@ -7,7 +7,7 @@ from gurobipy import GRB
 from src.base_model import MBCModel
 
 
-def try_alternate(x, u, v, i):
+def var_swap(x, u, v, i):
     """
     This function gets the value of x[e, i] for e=[u, v] when the order of the vertices in the graph
     definition is unknown.
@@ -40,7 +40,7 @@ class NaturalModel(MBCModel):
                 continue
             cycle_edges = [[cycle[0], cycle[1]], [cycle[1], cycle[2]], [cycle[2], cycle[0]]]
             m.addConstrs(
-                gp.quicksum(try_alternate(x, u, v, i) for u, v in cycle_edges) <= 2*z[i]
+                gp.quicksum(var_swap(x, u, v, i) for u, v in cycle_edges) <= 2 * z[i]
                 for i in self.bicliques)
 
         for e, f, cr1, cr2 in self.get_disjoint_edges():
@@ -51,20 +51,20 @@ class NaturalModel(MBCModel):
                 m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] for i in self.bicliques)
             # 4f
             if cr1 == 2 and cr2 < 2:
-                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + try_alternate(x, a, d, i) for i in self.bicliques)
-                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + try_alternate(x, b, c, i) for i in self.bicliques)
+                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + var_swap(x, a, d, i) for i in self.bicliques)
+                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + var_swap(x, b, c, i) for i in self.bicliques)
             # 4g
             if cr1 < 2 and cr2 == 2:
-                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + try_alternate(x, a, c, i) for i in self.bicliques)
-                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + try_alternate(x, b, d, i) for i in self.bicliques)
+                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + var_swap(x, a, c, i) for i in self.bicliques)
+                m.addConstrs(x[a, b, i] + x[c, d, i] <= z[i] + var_swap(x, b, d, i) for i in self.bicliques)
             # 4h
             if cr1 == 2 and cr2 == 2:
                 m.addConstrs(
                     x[a, b, i] + x[c, d, i] <=
-                    z[i] + try_alternate(x, a, c, i) + try_alternate(x, a, d, i) for i in self.bicliques)
+                    z[i] + var_swap(x, a, c, i) + var_swap(x, a, d, i) for i in self.bicliques)
                 m.addConstrs(
                     x[a, b, i] + x[c, d, i] <=
-                    z[i] + try_alternate(x, b, c, i) + try_alternate(x, b, d, i) for i in self.bicliques)
+                    z[i] + var_swap(x, b, c, i) + var_swap(x, b, d, i) for i in self.bicliques)
         # 4i
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
 
