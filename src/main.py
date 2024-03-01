@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from datetime import datetime
-from os import path, getcwd, pardir, mkdir
+from os import path, pardir, mkdir
 
 from src.util import GraphReport, read_run_config_file, RunConfig, get_graph_in_store, \
     get_file_name_and_extension, chronometer
@@ -11,7 +11,8 @@ def create_and_save_model_comparison_report(
         report_name: str, run_configs: list[RunConfig], time_limit: int = None,
         suppress_ts_in_report_name: bool = True, **kwargs):
     # get log directory
-    dir_parent = path.abspath(path.join(getcwd(), pardir))
+    current_dir = path.dirname(path.abspath(__file__))
+    dir_parent = path.abspath(path.join(current_dir, pardir))
     dir_logs = path.join(dir_parent, 'logs')
     if not path.isdir(dir_logs):
         mkdir(dir_logs)
