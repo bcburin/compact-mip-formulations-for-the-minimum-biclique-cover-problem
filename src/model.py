@@ -100,7 +100,7 @@ class ExtendedModel(MBCModel):
         m.addConstrs(y[u, i, 0] + y[v, i, 1] <= z[i] + x[u, v, i]
                      for u, v in self.directed.edges for i in self.bicliques)
         # 5d
-        m.addConstrs(y[u, i, 0] + y[i, i, 1] <= z[i] for u in self.g.nodes for i in self.bicliques)
+        m.addConstrs(y[u, i, 0] + y[u, i, 1] <= z[i] for u in self.g.nodes for i in self.bicliques)
         # 5e
         for u, v in self.g.edges:
             m.addConstr(gp.quicksum(x[u, v, i] + x[v, u, i] for i in self.bicliques) >= 1)
