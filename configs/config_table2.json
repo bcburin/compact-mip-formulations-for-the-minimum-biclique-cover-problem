@@ -1,50 +1,50 @@
 [
   {
     "graph": "lesmis76.gml",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "jazz-musicians.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "ieee57.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "ieee300.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "football114.gml",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "rado-emails.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "ieee118.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "surfers.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "ieee30.txt",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "karate34.gml",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "dolphins62.gml",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   },
   {
     "graph": "adjnoun111.gml",
-    "model": "NaturalModel"
+    "model": "ExtendedModel"
   }
 ]
