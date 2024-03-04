@@ -15,6 +15,7 @@ class LBComputeMethod(Enum):
     LOVASZ = auto()
     CLIQUE = auto()
     INDEPENDENT_EDGES = auto()
+    MAXIMAL_INDEPENDENT_SET = auto()
 
 
 class UBComputeMethod(Enum):
@@ -24,7 +25,7 @@ class UBComputeMethod(Enum):
 
 def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH) -> int:
     match method:
-        case LBComputeMethod.MATCH:
+        case LBComputeMethod.MATCH:  # good for sparse graph
             m_len = len(nx.max_weight_matching(g))
             e_len = len(g.edges)
             return np.ceil(m_len ** 2 / e_len)
@@ -36,6 +37,9 @@ def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.M
             return np.ceil(np.log2(max_clique(g)))
         case LBComputeMethod.INDEPENDENT_EDGES:
             return compute_lb_by_independent_edges_method(g)
+        case LBComputeMethod.MAXIMAL_INDEPENDENT_SET:  # should be good for dense graphs
+            cliques = nx.find_cliques(nx.complement(g))
+            return np.ceil(np.log2(len(cliques)))
         case _:
             raise ValueError("Unsupported Method")
 
@@ -88,44 +92,24 @@ def max_clique(g: nx.Graph) -> int:
         print('Encountered an attribute error')
 
 
-def compute_lb_by_independent_edges_method(g: nx.Graph | nx.DiGraph) -> int:
-    if isinstance(g, nx.Graph):
-        g = g.to_directed(as_view=True)
-    try:
-        # define model
-        m = gp.Model()
-        # define vars
-        r = m.addVars(g.nodes, vtype=GRB.BINARY, name='r')
-        y = m.addVars(g.edges)
-        # define objective function
-        m.setObjective(gp.quicksum(r), GRB.MAXIMIZE)
-        # add constraints
-        m.addConstrs(gp.quicksum([y[e] for e in g.in_edges(v)]) + r[v] <= 1 for v in g.nodes)
-        m.addConstrs(r[u] + r[v] <= 1 for u, v in g.edges)
-        for v in g.nodes:
-            m.addConstrs(y[e] <= r[v] for e in g.out_edges(v))
-        m.addConstrs(r[v] <= gp.quicksum([y[e] for e in g.out_edges(v)]) for v in g.nodes)
-        for e1, e2 in combinations(g.edges, r=2):
-            u, v = e1
-            c, d = e2
-            if (not {u, v} & {c, d} and
-                    ((g.has_edge(c, u) and g.has_edge(d, v)) or
-                     (g.has_edge(c, v) and g.has_edge(d, u)))):
-                m.addConstr(y[(u, v)] + y[(v, u)] + y[(c, d)] + y[(d, c)] <= 1, name='c0')
-        # set a one-minute time limit
-        m.Params.TimeLimit = 60
-        # optimize
-        m.optimize()
-
-        if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
-            return m.objVal
-        else:
-            print("There is an error in the maximum clique problem!")
-
-    except gp.GurobiError as e:
-        print('Error code ' + str(e.errno) + ': ' + str(e))
-    except AttributeError:
-        print('Encountered an attribute error')
+def compute_lb_by_independent_edges_method(g: nx.Graph) -> int:
+    m = gp.Model()
+    y = m.addVars(g.edges, vtype=GRB.BINARY)
+    # objective function
+    m.setObjective(gp.quicksum(y[e] for e in g.edges), GRB.MAXIMIZE)
+    # constraints
+    m.addConstrs(gp.quicksum(y[e] for e in g.nodes(v)) <= 1 for v in g.nodes)
+    for e1, e2 in combinations(g.edges, r=2):
+        a, b = e1
+        c, d = e2
+        if (g.has_edge(a, d) and g.has_edge(b, c)) or (g.has_edge(a, c) and g.has_edge(b, d)):
+            m.addConstr(y[a, b] + y[c, d] <= 1)
+    # solve model
+    m.optimize()
+    if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
+        return m.objVal
+    else:
+        return 1
 
 
 def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER) -> int:
