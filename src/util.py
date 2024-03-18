@@ -354,7 +354,7 @@ class GraphReport:
         self._props[p_name] = False
         self._rows = 0
 
-    def add_property(self, p_name: str, add_time_property: bool = False):
+    def add_property(self, p_name: str, add_time_property: bool = True):
         """
         Add a graph property to the report. Repeated properties are ignored.
 
@@ -366,18 +366,18 @@ class GraphReport:
             raise RuntimeError('Property definition phase already ended.')
         self._add_property(p_name, add_time_property)
 
-    def add_properties(self, props: list[str]):
+    def add_properties(self, props: list[str], add_time_property: bool = True):
         """
-        Add multiple properties to the report. Automatically adds the corresponding calculation time property for
-        each property added. Repeated properties are ignored.
-simple_5_7.gml
+        Add multiple properties to the report. Repeated properties are ignored.
+        :param add_time_property: Automatically adds the corresponding calculation time property for
+        each property added.
         :param props: A list of property names to add.
         :raises RuntimeError: If property definition phase has already ended.
         """
         if self._finished_setup:
             raise RuntimeError('Property definition phase already ended.')
         for prop in props:
-            self._add_property(prop, False)
+            self._add_property(prop, add_time_property)
 
     def _reset_props(self):
         for p_name in self._props.keys():
