@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import cache
 from itertools import combinations
@@ -9,27 +10,29 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.bc_bounds import LBComputeMethod, UBComputeMethod, find_bc_upper_bound
+from src.bc_bounds import LBComputeMethod, UBComputeMethod, find_bc_upper_bound, find_bc_lower_bound
 
 
 class MBCModel(ABC):
 
-    def __init__(
+    def __init__(  # TODO: implement bottom-up model
              self,
              g: nx.Graph,
              g_name: str,
-             lb_method: LBComputeMethod | None = None,
-             ub_method: UBComputeMethod = UBComputeMethod.VERTEX,
+             default_lb_method: LBComputeMethod | None = None,
+             default_ub_method: UBComputeMethod = UBComputeMethod.VERTEX,
              time_limit: int = None,
              log_to_console: bool = True,
              dir_logs: str = None):
         self.g = g
         self.g_name = g_name
-        self.lb_method = lb_method
-        self.ub_method = ub_method
+        self._default_lb_method = default_lb_method
+        self._default_ub_method = default_ub_method
+        self._time_limit = time_limit
+        self._log_to_console = log_to_console
+        self._dir_logs = dir_logs
         self._logging = bool(dir_logs)
-        self.time_limit = time_limit
-        self.log_to_console = log_to_console
+        self._forced_lower_bound = None
         # model
         self._init_model()
         # create log files
@@ -39,6 +42,12 @@ class MBCModel(ABC):
         self._set_parameters()
         # initial state
         self._solved = False
+
+    def copy(self) -> MBCModel:
+        return self.__init__(
+            g=self.g, g_name=self.g_name, default_lb_method=self._default_lb_method,
+            default_ub_method=self._default_ub_method, time_limit=self._time_limit,
+            log_to_console=self._log_to_console, dir_logs=self._dir_logs)
 
     def __del__(self):
         if hasattr(self, '_files_open') and self._files_open:
@@ -57,9 +66,9 @@ class MBCModel(ABC):
             self.log_res.close()
 
     def _set_parameters(self):
-        if self.time_limit is not None:
-            self.m.Params.TimeLimit = self.time_limit
-        if not self.log_to_console:
+        if self._time_limit is not None:
+            self.m.Params.TimeLimit = self._time_limit
+        if not self._log_to_console:
             self.m.Params.LogToConsole = 0
         if self._logging:
             self.m.Params.LogFile = self.log_grb.name
@@ -77,7 +86,7 @@ class MBCModel(ABC):
 
     @abstractmethod
     def _add_variables(self):
-        ...
+        self.z = self.m.addVars(self.bicliques, vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="z")
 
     @abstractmethod
     def _add_constraints(self):
@@ -97,10 +106,7 @@ class MBCModel(ABC):
         ...
 
     def _pre_solve(self):
-        # add lower bound constraints
-        if self.lb_method:
-            for b in range(self.lower_bound()):
-                self.z[b].lb = 1
+        ...
 
     def _post_solve(self):
         # check and log solution
@@ -110,7 +116,7 @@ class MBCModel(ABC):
             # check solution
             self.log_res.write(f'IS BICLIQUE COVER? {"Y" if self._check_biclique_cover() else "N"}')
         elif self.m.status == GRB.TIME_LIMIT:
-            self.log_res.write(f'\nMODEL REACHED TIME LIMIT OF {self.time_limit} SECONDS\n\n')
+            self.log_res.write(f'\nMODEL REACHED TIME LIMIT OF {self._time_limit} SECONDS\n\n')
         elif self.m.status == GRB.INFEASIBLE:
             self.log_res.write('\nMODEL HAS BEEN MARKED AS UNFEASIBLE\n\n')
         else:
@@ -132,17 +138,28 @@ class MBCModel(ABC):
     def directed_complement(self) -> nx.Graph:
         return nx.complement(self.directed)
 
-    @cache
-    def lower_bound(self) -> int:
-        return 1
+    def force_lower_bound(self, lb: int):
+        self._forced_lower_bound = lb
 
     @cache
-    def upper_bound(self) -> int:
-        return int(find_bc_upper_bound(self.g, self.ub_method))
+    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
+        if self._forced_lower_bound is not None:
+            return self._forced_lower_bound
+        lb_method = lb_method or self._default_lb_method
+        return int(find_bc_lower_bound(self.g, self._default_lb_method)) if lb_method else 1
+
+    @cache
+    def upper_bound(self, ub_method: UBComputeMethod | None = None) -> int:
+        ub_method = ub_method or self._default_ub_method
+        return int(find_bc_upper_bound(self.g, self._default_ub_method)) if ub_method else 1
 
     @property
     def bicliques(self) -> Iterable:
         return range(self.upper_bound())
+
+    def add_lb_constraints(self):
+        for b in range(self.lower_bound()):
+            self.z[b].lb = 1
 
     @cache
     def get_disjoint_edges(self) -> set[tuple[int, int, int, int]]:
@@ -163,7 +180,7 @@ class MBCModel(ABC):
                 disjoint_edges.add((e, f, cr1, cr2))
         return disjoint_edges
 
-    def solve(self):
+    def solve(self) -> float:
         # custom pre-solve with default implementation
         self._pre_solve()
         # optimization process
