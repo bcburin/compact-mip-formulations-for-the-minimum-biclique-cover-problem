@@ -32,22 +32,26 @@ def create_and_save_model_comparison_report(
     report = GraphReport(name=report_name)
     report.add_properties([str_model, str_k, str_time_k, str_lb, str_ub, str_time])
     # runs from configuration
-    for run_config in run_configs:
-        g = get_graph_in_store(filename=run_config.graph)
-        g_name, _ = get_file_name_and_extension(fname=run_config.graph)
-        report.add_graph_data(g, g_name)
-        run_model = getattr(model_classes, run_config.model)
-        model = run_model(g=g, g_name=g_name, dir_logs=dir_ts_logs, time_limit=time_limit, **kwargs)
-        # calculate values
-        k, t_k = chronometer(model.upper_bound)
-        ub, time = chronometer(f=model.solve)
-        # add values to report
-        report.add_property_values(p_name=str_model, p_value=run_config.model)
-        report.add_property_values(p_name=str_k, p_value=k)
-        report.add_property_values(p_name=str_time_k, p_value=t_k)
-        report.add_property_values(p_name=str_lb, p_value=model.m.ObjBoundC)
-        report.add_property_values(p_name=str_ub, p_value=ub)
-        report.add_property_values(p_name=str_time, p_value=time)
+    try:
+        for run_config in run_configs:
+            g = get_graph_in_store(filename=run_config.graph)
+            g_name, _ = get_file_name_and_extension(fname=run_config.graph)
+            report.add_graph_data(g, g_name)
+            run_model = getattr(model_classes, run_config.model)
+            model = run_model(g=g, g_name=g_name, dir_logs=dir_ts_logs, time_limit=time_limit, **kwargs)
+            # calculate values
+            k, t_k = chronometer(model.upper_bound)
+            ub, time = chronometer(f=model.solve)
+            # add values to report
+            report.add_property_values(p_name=str_model, p_value=run_config.model)
+            report.add_property_values(p_name=str_k, p_value=k)
+            report.add_property_values(p_name=str_time_k, p_value=t_k)
+            report.add_property_values(p_name=str_lb, p_value=model.m.ObjBoundC)
+            report.add_property_values(p_name=str_ub, p_value=ub)
+            report.add_property_values(p_name=str_time, p_value=time)
+    except Exception as e:
+        print(e)
+        report.save_csv(cleanup=True)
     # save report
     report.save_csv()
 

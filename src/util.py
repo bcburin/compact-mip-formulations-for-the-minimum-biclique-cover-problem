@@ -110,13 +110,14 @@ def get_graphs_in_store(
             if recursive and path.isdir(filepath):
                 sub_seq = get_graphs_in_store(max_nodes=max_nodes,
                                               max_edges=max_edges,
-                                              max_graphs=max_graphs-count,
+                                              max_graphs=max_graphs-count if max_graphs else None,
                                               fname_regex=fname_regex,
                                               graph_dir=filepath,
                                               include_extension=include_extension,
                                               recursive=True)
                 for sub_g, sub_name in sub_seq:
                     yield sub_g, sub_name
+                continue
             else:
                 continue
         g = build_graph_from_file(fpath=filepath)
@@ -453,14 +454,22 @@ class GraphReport:
             raise RuntimeError(f'Not all properties have been filled in row {self._rows}.')
         return DataFrame(data=self._data, **kwargs)
 
+    def _cleanup_rows(self):
+        min_length = min(len(lst) for lst in self._data.values())
+        for prop, lst in self._data.items():
+            if len(lst) > min_length:
+                self._data[prop] = lst[:min_length]
+
     def save_csv(self,
                  save_dir: str = None,
                  create_dir: bool = True,
                  report_name: str = None,
-                 replace: bool = False, **kwargs):
+                 replace: bool = False,
+                 cleanup: bool = False, **kwargs):
         """
         Save the report data to a CSV file.
 
+        :param cleanup: check for any unfilled properties in last row. In case there is any, remove last row.
         :param save_dir: The directory where the CSV file will be saved.
         :param create_dir: Create the directory if it doesn't exist.
         :param report_name: The name of the CSV file.
@@ -468,6 +477,8 @@ class GraphReport:
         :param kwargs: Additional keyword arguments for DataFrame.to_csv().
         :raises FileNotFoundError: If the provided directory doesn't exist and cannot be created.
         """
+        if cleanup:
+            self._cleanup_rows()
         df_data = self.get_report_data()
         if save_dir is None:
             parent_dir = path.abspath(path.join(getcwd(), pardir))
