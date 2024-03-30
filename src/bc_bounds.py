@@ -23,7 +23,7 @@ class UBComputeMethod(Enum):
     VERTEX = auto()
 
 
-def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH) -> int:
+def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH, time_limit: int = None) -> int:
     match method:
         case LBComputeMethod.MATCH:  # good for sparse graph
             m_len = len(nx.max_weight_matching(g))
@@ -36,9 +36,9 @@ def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.M
         case LBComputeMethod.CLIQUE:
             return np.ceil(np.log2(max_clique(g)))
         case LBComputeMethod.INDEPENDENT_EDGES:
-            return compute_lb_by_independent_edges_method(g)
+            return compute_lb_by_independent_edges_method(g, time_limit=time_limit)
         case LBComputeMethod.MAXIMAL_INDEPENDENT_SET:  # should be good for dense graphs
-            cliques = nx.find_cliques(nx.complement(g))
+            cliques = list(nx.find_cliques(nx.complement(g)))
             return np.ceil(np.log2(len(cliques)))
         case _:
             raise ValueError("Unsupported Method")
@@ -92,18 +92,26 @@ def max_clique(g: nx.Graph) -> int:
         print('Encountered an attribute error')
 
 
-def compute_lb_by_independent_edges_method(g: nx.Graph) -> int:
+def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None) -> int:
     m = gp.Model()
     y = m.addVars(g.edges, vtype=GRB.BINARY)
+    # set time limit
+    if time_limit:
+        m.Params.TimeLimit = time_limit
     # objective function
     m.setObjective(gp.quicksum(y[e] for e in g.edges), GRB.MAXIMIZE)
     # constraints
-    m.addConstrs(gp.quicksum(y[e] for e in g.nodes(v)) <= 1 for v in g.nodes)
+    for v in g.nodes:
+        for e in g.edges(v):
+            try:
+                m.addConstr(y[e] <= 1, name=f'(9b) for ({e[0]}, {e[1]}) from v={v}')
+            except KeyError:
+                m.addConstr(y[e[1], e[0]] <= 1, name=f'(9b) for ({e[1]}, {e[0]}) from v={v}')
     for e1, e2 in combinations(g.edges, r=2):
         a, b = e1
         c, d = e2
         if (g.has_edge(a, d) and g.has_edge(b, c)) or (g.has_edge(a, c) and g.has_edge(b, d)):
-            m.addConstr(y[a, b] + y[c, d] <= 1)
+            m.addConstr(y[a, b] + y[c, d] <= 1, name=f'(9c) for ({a}, {b}) and ({c}, {d})')
     # solve model
     m.optimize()
     if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
@@ -112,23 +120,25 @@ def compute_lb_by_independent_edges_method(g: nx.Graph) -> int:
         return 1
 
 
-def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER) -> int:
+def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER, time_limit: int = None) -> int:
     match method:
         case UBComputeMethod.NUMBER:
             n = len(g.nodes)
             return n + 1 - np.floor(np.log2(n))
         case UBComputeMethod.VERTEX:
-            return vertex_cover(g)
+            return vertex_cover(g, time_limit=time_limit)
         case _:
             raise ValueError("Unsupported Method")
 
 
-def vertex_cover(g: nx.Graph) -> int:
+def vertex_cover(g: nx.Graph, time_limit: int = None) -> int:
     try:
         # define model
         m = gp.Model()
         # set params
         m.Params.LogToConsole = 0
+        if time_limit:
+            m.Params.TimeLimit = time_limit
         # define vars
         x = m.addVars(g.nodes, vtype=GRB.BINARY, name="x")
         # define objective function
@@ -152,17 +162,20 @@ def vertex_cover(g: nx.Graph) -> int:
 
 
 if __name__ == "__main__":
-    report = GraphReport('bounds')
+    model_time_limit = 60
+    report = GraphReport('bounds-all')
     report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
     report.add_properties([str(method) for method in UBComputeMethod])
     # iterate graphs
-    for g, g_name in get_graphs_in_store():
+    for g, g_name in get_graphs_in_store(recursive=False):
         report.add_graph_data(g, g_name)
         for method in LBComputeMethod:
             # LOVASZ is too slow for a small number of edges
             if method == LBComputeMethod.LOVASZ:
                 continue
-            report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g)
+            report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g,
+                                                     method=method, time_limit=model_time_limit)
         for method in UBComputeMethod:
-            report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g)
+            report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
+                                                     method=method, time_limit=model_time_limit)
     report.save_csv()
