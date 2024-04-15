@@ -1,5 +1,6 @@
 from enum import Enum, auto
 from itertools import combinations
+from time import time
 
 import gurobipy as gp
 from gurobipy import GRB
@@ -23,7 +24,21 @@ class UBComputeMethod(Enum):
     VERTEX = auto()
 
 
-def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH, time_limit: int = None) -> int:
+def count_cliques(g: nx.Graph, timeout: int = None, size_limit: int = None, verification_interval: int = 1000) -> int:
+    clique_count = 0
+    start_time = time()
+    for _ in nx.find_cliques(nx.complement(g)):
+        if clique_count % verification_interval == 0:
+            if timeout and time() - start_time >= timeout:
+                return clique_count
+            if size_limit and clique_count >= size_limit:
+                return clique_count
+        clique_count += 1
+    return clique_count
+
+
+def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.MATCH,
+                        time_limit: int = None, memory_limit: int = None) -> int:
     match method:
         case LBComputeMethod.MATCH:  # good for sparse graph
             m_len = len(nx.max_weight_matching(g))
@@ -36,10 +51,10 @@ def find_bc_lower_bound(g: nx.Graph, method: LBComputeMethod = LBComputeMethod.M
         case LBComputeMethod.CLIQUE:
             return np.ceil(np.log2(max_clique(g)))
         case LBComputeMethod.INDEPENDENT_EDGES:
-            return compute_lb_by_independent_edges_method(g, time_limit=time_limit)
+            return compute_lb_by_independent_edges_method(g, time_limit=time_limit, memory_limit=memory_limit)
         case LBComputeMethod.MAXIMAL_INDEPENDENT_SET:  # should be good for dense graphs
-            cliques = list(nx.find_cliques(nx.complement(g)))
-            return np.ceil(np.log2(len(cliques)))
+            number_of_cliques = count_cliques(g, timeout=time_limit, size_limit=int(memory_limit*1e9/4))
+            return np.ceil(np.log2(number_of_cliques))
         case _:
             raise ValueError("Unsupported Method")
 
@@ -92,12 +107,14 @@ def max_clique(g: nx.Graph) -> int:
         print('Encountered an attribute error')
 
 
-def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None) -> int:
+def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> int:
     m = gp.Model()
     y = m.addVars(g.edges, vtype=GRB.BINARY)
     # set time limit
     if time_limit:
         m.Params.TimeLimit = time_limit
+    if memory_limit:
+        m.Params.SoftMemLimit = memory_limit
     # objective function
     m.setObjective(gp.quicksum(y[e] for e in g.edges), GRB.MAXIMIZE)
     # constraints
@@ -120,18 +137,19 @@ def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None) 
         return 1
 
 
-def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER, time_limit: int = None) -> int:
+def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER,
+                        time_limit: int = None, memory_limit: int = None) -> int:
     match method:
         case UBComputeMethod.NUMBER:
             n = len(g.nodes)
             return n + 1 - np.floor(np.log2(n))
         case UBComputeMethod.VERTEX:
-            return vertex_cover(g, time_limit=time_limit)
+            return vertex_cover(g, time_limit=time_limit, memory_limit=memory_limit)
         case _:
             raise ValueError("Unsupported Method")
 
 
-def vertex_cover(g: nx.Graph, time_limit: int = None) -> int:
+def vertex_cover(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> int:
     try:
         # define model
         m = gp.Model()
@@ -139,6 +157,8 @@ def vertex_cover(g: nx.Graph, time_limit: int = None) -> int:
         m.Params.LogToConsole = 0
         if time_limit:
             m.Params.TimeLimit = time_limit
+        if memory_limit:
+            m.Params.SoftMemLimit = memory_limit
         # define vars
         x = m.addVars(g.nodes, vtype=GRB.BINARY, name="x")
         # define objective function
@@ -163,7 +183,8 @@ def vertex_cover(g: nx.Graph, time_limit: int = None) -> int:
 
 if __name__ == "__main__":
     model_time_limit = 60
-    report = GraphReport('bounds-all')
+    model_memory_limit = 4
+    report = GraphReport('bounds')
     report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
     report.add_properties([str(method) for method in UBComputeMethod])
     # iterate graphs
@@ -174,8 +195,10 @@ if __name__ == "__main__":
             if method == LBComputeMethod.LOVASZ:
                 continue
             report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g,
-                                                     method=method, time_limit=model_time_limit)
+                                                     method=method, time_limit=model_time_limit,
+                                                     memory_limit=model_memory_limit)
         for method in UBComputeMethod:
             report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
-                                                     method=method, time_limit=model_time_limit)
+                                                     method=method, time_limit=model_time_limit,
+                                                     memory_limit=model_memory_limit)
     report.save_csv()
