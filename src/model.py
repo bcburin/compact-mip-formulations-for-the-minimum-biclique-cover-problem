@@ -4,7 +4,7 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.base_model import MBCModel
+from src.base_model import MBCModel, BottomUpMBCModel
 from src.util import is_biclique, var_swap
 
 
@@ -78,6 +78,13 @@ class NaturalModel(MBCModel):
         return 'Compact Natural Model'
 
 
+class BottomUpNaturalModel(NaturalModel, BottomUpMBCModel):
+
+    @classmethod
+    def name(cls) -> str:
+        return 'Bottom-up Natural Model'
+
+
 class ExtendedModel(MBCModel):
 
     def _add_variables(self):
@@ -130,3 +137,10 @@ class ExtendedModel(MBCModel):
     @classmethod
     def name(cls) -> str:
         return 'Extended Model'
+
+
+class BottomUpExtendedModel(ExtendedModel, BottomUpMBCModel):
+
+    @classmethod
+    def name(cls) -> str:
+        return "Bottom-up Extended Model"

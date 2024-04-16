@@ -1,0 +1,74 @@
+[
+  {
+    "graph": "lesmis76.gml",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "jazz-musicians.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "ieee57.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "ieee300.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "football114.gml",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "rado-emails.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "ieee118.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "surfers.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "ieee30.txt",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "karate34.gml",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "dolphins62.gml",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  },
+  {
+    "graph": "adjnoun111.gml",
+    "model": "BottomUpNaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
+  }
+]

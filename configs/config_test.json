@@ -1,14 +1,24 @@
 [
   {
     "graph": "simple_5_7.gml",
-    "model": "NaturalModel"
+    "model": "NaturalModel",
+    "lb_method": "INDEPENDENT_EDGES",
+    "ub_method": "VERTEX"
   },
   {
     "graph": "simple_5_7.gml",
     "model": "ExtendedModel"
   },
   {
+    "graph": "simple_5_7.gml",
+    "model": "BottomUpNaturalModel"
+  },
+  {
     "graph": "ieee30.txt",
     "model": "NaturalModel"
+  },
+  {
+    "graph": "ieee30.txt",
+    "model": "BottomUpNaturalModel"
   }
 ]

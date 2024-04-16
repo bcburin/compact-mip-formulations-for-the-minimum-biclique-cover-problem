@@ -299,6 +299,8 @@ def get_logs_directory(name: str):
 class RunConfig(BaseModel):
     graph: str
     model: str
+    lb_method: str = "INDEPENDENT_EDGES"
+    ub_method: str = "VERTEX"
 
 
 def read_run_config_file(config_file_path: str) -> list[RunConfig]:

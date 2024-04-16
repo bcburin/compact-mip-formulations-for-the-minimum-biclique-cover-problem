@@ -19,11 +19,12 @@ class MBCModel(ABC):
              self,
              g: nx.Graph,
              g_name: str,
-             default_lb_method: LBComputeMethod | None = None,
+             default_lb_method: LBComputeMethod = LBComputeMethod.MATCH,
              default_ub_method: UBComputeMethod = UBComputeMethod.VERTEX,
              time_limit: int = None,
              log_to_console: bool = True,
-             dir_logs: str = None):
+             dir_logs: str = None,
+             k: int = None):
         self.g = g
         self.g_name = g_name
         self._default_lb_method = default_lb_method
@@ -32,7 +33,7 @@ class MBCModel(ABC):
         self._log_to_console = log_to_console
         self._dir_logs = dir_logs
         self._logging = bool(dir_logs)
-        self._forced_lower_bound = None
+        self.k = k
         # model
         self._init_model()
         # create log files
@@ -43,11 +44,11 @@ class MBCModel(ABC):
         # initial state
         self._solved = False
 
-    def copy(self) -> MBCModel:
-        return self.__init__(
+    def copy(self, k: int = None) -> MBCModel:
+        return self.__class__(
             g=self.g, g_name=self.g_name, default_lb_method=self._default_lb_method,
             default_ub_method=self._default_ub_method, time_limit=self._time_limit,
-            log_to_console=self._log_to_console, dir_logs=self._dir_logs)
+            log_to_console=self._log_to_console, dir_logs=self._dir_logs, k=k)
 
     def __del__(self):
         if hasattr(self, '_files_open') and self._files_open:
@@ -61,9 +62,8 @@ class MBCModel(ABC):
         self._files_open = True
 
     def _close_files(self):
-        if self._logging:
-            self.log_grb.close()
-            self.log_res.close()
+        self.log_grb.close()
+        self.log_res.close()
 
     def _set_parameters(self):
         if self._time_limit is not None:
@@ -121,7 +121,8 @@ class MBCModel(ABC):
             self.log_res.write('\nMODEL HAS BEEN MARKED AS UNFEASIBLE\n\n')
         else:
             self.log_res.write(f'\nSTATUS CODE: {self.m.status}\n\n')
-        self._close_files()
+        if self._logging:
+            self._close_files()
 
     @property
     @cache
@@ -138,18 +139,15 @@ class MBCModel(ABC):
     def directed_complement(self) -> nx.Graph:
         return nx.complement(self.directed)
 
-    def force_lower_bound(self, lb: int):
-        self._forced_lower_bound = lb
-
     @cache
     def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
-        if self._forced_lower_bound is not None:
-            return self._forced_lower_bound
         lb_method = lb_method or self._default_lb_method
         return int(find_bc_lower_bound(self.g, self._default_lb_method)) if lb_method else 1
 
     @cache
     def upper_bound(self, ub_method: UBComputeMethod | None = None) -> int:
+        if self.k:
+            return self.k
         ub_method = ub_method or self._default_ub_method
         return int(find_bc_upper_bound(self.g, self._default_ub_method)) if ub_method else 1
 
@@ -180,7 +178,10 @@ class MBCModel(ABC):
                 disjoint_edges.add((e, f, cr1, cr2))
         return disjoint_edges
 
-    def solve(self) -> float:
+    def infeasible_or_unsolved(self) -> bool:
+        return self.m.status in [GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.INTERRUPTED, GRB.LOADED]
+
+    def solve(self) -> float | None:
         # custom pre-solve with default implementation
         self._pre_solve()
         # optimization process
@@ -190,4 +191,20 @@ class MBCModel(ABC):
         # custom post-solve with default implementation
         self._post_solve()
         # return obj val
-        return self.m.objVal
+        if not self.infeasible_or_unsolved():
+            return self.m.objVal
+
+
+class BottomUpMBCModel(MBCModel, ABC):
+
+    def solve(self) -> float | None:
+        k = self.lower_bound()
+        self._close_files()
+        while True:
+            if k > self.upper_bound():
+                return None
+            model = self.copy(k=k)
+            super(BottomUpMBCModel, model).solve()
+            if model.m.status == GRB.OPTIMAL:
+                return model.m.objVal
+            k += 1
