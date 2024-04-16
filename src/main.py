@@ -44,9 +44,13 @@ def create_and_save_model_comparison_report(
                 default_lb_method=getattr(LBComputeMethod, run_config.lb_method),
                 default_ub_method=getattr(UBComputeMethod, run_config.ub_method), **kwargs)
             # calculate values
-            k, t_k = chronometer(model.upper_bound)
-            ub, time = chronometer(f=model.solve)
-            lb = model.m.ObjBoundC if not model.infeasible_or_unsolved() else None
+            try:
+                k, t_k = chronometer(model.upper_bound)
+                ub, time = chronometer(f=model.solve)
+                lb = model.m.ObjBoundC if not model.infeasible_or_unsolved() else None
+            except Exception as e:
+                print(f'Error running {run_config}: {e}')
+                continue
             # add values to report
             report.add_property_values(p_name=str_model, p_value=run_config.model)
             report.add_property_values(p_name=str_k, p_value=k)
