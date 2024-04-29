@@ -108,6 +108,12 @@ def max_clique(g: nx.Graph) -> int:
 
 
 def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> int:
+    lb, _ = compute_lb_and_get_edges_by_independent_edges_method(g, time_limit, memory_limit)
+    return lb
+
+
+def compute_lb_and_get_edges_by_independent_edges_method(
+        g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> tuple[int, list]:
     m = gp.Model()
     y = m.addVars(g.edges, vtype=GRB.BINARY)
     # set time limit
@@ -131,10 +137,12 @@ def compute_lb_by_independent_edges_method(g: nx.Graph, time_limit: int = None, 
             m.addConstr(y[a, b] + y[c, d] <= 1, name=f'(9c) for ({a}, {b}) and ({c}, {d})')
     # solve model
     m.optimize()
+    # return values
     if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
-        return m.objVal
+        edges = [e for e in g.edges if y[e].X == 1]
+        return m.objVal, edges
     else:
-        return 1
+        return 1, []
 
 
 def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.NUMBER,

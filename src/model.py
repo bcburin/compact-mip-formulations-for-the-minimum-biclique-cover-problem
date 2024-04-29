@@ -1,10 +1,12 @@
+from functools import cache
 from itertools import combinations
 
 import gurobipy as gp
 import networkx as nx
-from gurobipy import GRB
+from gurobipy import GRB, Var
 
 from src.base_model import MBCModel, BottomUpMBCModel
+from src.bc_bounds import LBComputeMethod, compute_lb_and_get_edges_by_independent_edges_method
 from src.util import is_biclique, var_swap
 
 
@@ -73,12 +75,40 @@ class NaturalModel(MBCModel):
                 return False
         return True
 
+    def _pre_solve(self):
+        for b in range(self.lower_bound()):
+            self.z[b].lb = 1
+
+    def _add_independent_edges_constraints(self, edges: list[Var]):
+        for biclique in self.bicliques:
+            if biclique >= len(edges):
+                return
+            a, b = edges[biclique]
+            try:
+                self.x[a, b, biclique].lb = 1
+            except KeyError:
+                self.x[b, a, biclique].lb = 1
+
+    @cache
+    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
+        lb_method = lb_method or self._default_lb_method
+        if lb_method == LBComputeMethod.INDEPENDENT_EDGES:
+            lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
+            self._add_independent_edges_constraints(edges=edges)
+            return int(lb)
+        else:
+            return super().lower_bound(lb_method)
+
     @classmethod
     def name(cls) -> str:
         return 'Compact Natural Model'
 
 
 class BottomUpNaturalModel(NaturalModel, BottomUpMBCModel):
+
+    def _pre_solve(self):
+        for b in range(self.upper_bound()):
+            self.z[b].lb = 1
 
     @classmethod
     def name(cls) -> str:
@@ -134,12 +164,38 @@ class ExtendedModel(MBCModel):
                 return False
         return True
 
+    def _pre_solve(self):
+        for b in range(self.lower_bound()):
+            self.z[b].lb = 1
+
+    def _add_independent_edges_constraints(self, edges: list[Var]):
+        for biclique in self.bicliques:
+            if biclique >= len(edges):
+                return
+            a, b = edges[biclique]
+            self.x[a, b, biclique].lb = 1
+            self.x[b, a, biclique].lb = 0
+
+    @cache
+    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
+        lb_method = lb_method or self._default_lb_method
+        if lb_method == LBComputeMethod.INDEPENDENT_EDGES:
+            lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
+            self._add_independent_edges_constraints(edges=edges)
+            return int(lb)
+        else:
+            return super().lower_bound(lb_method)
+
     @classmethod
     def name(cls) -> str:
         return 'Extended Model'
 
 
 class BottomUpExtendedModel(ExtendedModel, BottomUpMBCModel):
+
+    def _pre_solve(self):
+        for b in range(self.upper_bound()):
+            self.z[b].lb = 1
 
     @classmethod
     def name(cls) -> str:
