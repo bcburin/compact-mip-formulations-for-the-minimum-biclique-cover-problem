@@ -1,20 +1,8 @@
 [
   {
-    "graph": "ieee57.txt",
-    "model": "NaturalModel",
+    "graph": "ieee118.txt",
+    "model": "ExtendedModel",
     "lb_method": "INDEPENDENT_EDGES",
     "ub_method": "VERTEX"
-  },
-  {
-    "graph": "ieee57.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "ieee57.txt",
-    "model": "BottomUpNaturalModel"
-  },
-  {
-    "graph": "ieee57.txt",
-    "model": "BottomUpExtendedModel"
   }
 ]
