@@ -71,6 +71,7 @@ def create_parser():
     parser.add_argument('--time-limit',
                         help='default time limit in seconds to use in run configurations',
                         default=60*60)
+    parser.add_argument('--report-name', help='name of the output CSV file', default='report')
     return parser
 
 
@@ -81,7 +82,7 @@ def main():
     time_limit = args.time_limit
     run_configs = read_run_config_file(config_file_path=config_file)
     create_and_save_model_comparison_report(
-        report_name='test_report_simple', run_configs=run_configs, time_limit=int(time_limit))
+        report_name=args.report_name, run_configs=run_configs, time_limit=int(time_limit))
 
 
 if __name__ == '__main__':

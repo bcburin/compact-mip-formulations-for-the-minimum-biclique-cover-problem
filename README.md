@@ -24,6 +24,12 @@ where the `run_configs.json` is a file containing the specifications for a batch
 python -m src.main --time-limit 300 "configs/config_table1.json"
 ```
 
+Similarly, the parameter `--report-name` lets you specify the name of the output file for the CSV report. By default, it is simply "report".
+
+```commandline
+python -m src.main --time-limit 300 "configs/config_table1.json" --report-name "natural-model-tests"
+```
+
 Using the option `-h` shows the specifications of the CLI interface of the program.
 
 ```commandline
