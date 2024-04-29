@@ -114,13 +114,13 @@ class MBCModel(ABC):
             return
         if self.m.status == GRB.OPTIMAL:
             # check solution
-            self.log_res.write(f'IS BICLIQUE COVER? {"Y" if self._check_biclique_cover() else "N"}')
+            self.log_res.write(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
         elif self.m.status == GRB.TIME_LIMIT:
-            self.log_res.write(f'\nMODEL REACHED TIME LIMIT OF {self._time_limit} SECONDS\n\n')
+            self.log_res.write(f'Model reached time limit of {self._time_limit} seconds.\n')
         elif self.m.status == GRB.INFEASIBLE:
-            self.log_res.write('\nMODEL HAS BEEN MARKED AS UNFEASIBLE\n\n')
+            self.log_res.write('Model is unfeasible.\n')
         else:
-            self.log_res.write(f'\nSTATUS CODE: {self.m.status}\n\n')
+            self.log_res.write(f'Status code: {self.m.status}\n')
         if self._logging:
             self._close_files()
 
@@ -155,10 +155,6 @@ class MBCModel(ABC):
     def bicliques(self) -> Iterable:
         return range(self.upper_bound())
 
-    def add_lb_constraints(self):
-        for b in range(self.lower_bound()):
-            self.z[b].lb = 1
-
     @cache
     def get_disjoint_edges(self) -> set[tuple[int, int, int, int]]:
         disjoint_edges = set()
@@ -185,9 +181,10 @@ class MBCModel(ABC):
         # custom pre-solve with default implementation
         self._pre_solve()
         # optimization process
+        if self._logging:
+            self.log_res.write(f'Solving for graph {self.g_name} ({self.__class__.__name__})...')
         self.m.optimize()
         self._solved = True
-
         # custom post-solve with default implementation
         self._post_solve()
         # return obj val
@@ -199,12 +196,15 @@ class BottomUpMBCModel(MBCModel, ABC):
 
     def solve(self) -> float | None:
         k = self.lower_bound()
-        self._close_files()
         while True:
             if k > self.upper_bound():
                 return None
+            self.log_res.write(f'Solving for lower bound k={k}.\n')
             model = self.copy(k=k)
             super(BottomUpMBCModel, model).solve()
             if model.m.status == GRB.OPTIMAL:
+                self.log_res.write(f'Found solution for lower bound k={k}: {model.m.objVal}.\n')
                 return model.m.objVal
+            else:
+                self.log_res.write(f'Infeasible for lower bound k={k}.\n')
             k += 1
