@@ -3,6 +3,7 @@ import math
 from datetime import datetime
 from os import path, listdir, getcwd, pardir, mkdir, remove
 from itertools import combinations, product
+from pprint import pprint
 from random import random, randint
 from re import match
 from time import time
@@ -453,7 +454,7 @@ class GraphReport:
         if not self._finished_setup or not self._data:
             raise RuntimeError('No data to save.')
         if not all(self._props.values()):
-            raise RuntimeError(f'Not all properties have been filled in row {self._rows}.')
+            raise RuntimeError(f'Not all properties have been filled in row {self._rows}. \n _data={pprint(self._data)}')
         return DataFrame(data=self._data, **kwargs)
 
     def _cleanup_rows(self):
@@ -461,6 +462,8 @@ class GraphReport:
         for prop, lst in self._data.items():
             if len(lst) > min_length:
                 self._data[prop] = lst[:min_length]
+        for prop in self._props.keys():
+            self._props[prop] = True
 
     def save_csv(self,
                  save_dir: str = None,
