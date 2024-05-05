@@ -1,8 +1,28 @@
-[
-  {
-    "graph": "ieee118.txt",
-    "model": "ExtendedModel",
-    "lb_method": "INDEPENDENT_EDGES",
-    "ub_method": "VERTEX"
-  }
-]
+{
+  "report_name":  "test-ieee-report",
+  "default_lb_method": "independent_edges",
+  "default_ub_method": "vertex",
+  "default_time_limit": 300,
+  "default_edge_fix": true,
+  "default_bottom_up": false,
+  "run_configs": [
+    {
+      "graph": "ieee57.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "ExtendedModel",
+      "edge_fix": false
+    },
+    {
+      "graph": "ieee30.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee30.txt",
+      "model": "ExtendedModel",
+      "edge_fix": false
+    }
+  ]
+}

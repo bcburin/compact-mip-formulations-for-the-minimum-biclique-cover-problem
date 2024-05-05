@@ -1,50 +1,57 @@
-[
-  {
-    "graph": "lesmis76.gml",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "jazz-musicians.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "ieee57.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "ieee300.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "football114.gml",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "rado-emails.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "ieee118.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "surfers.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "ieee30.txt",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "karate34.gml",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "dolphins62.gml",
-    "model": "ExtendedModel"
-  },
-  {
-    "graph": "adjnoun111.gml",
-    "model": "ExtendedModel"
-  }
-]
+{
+  "report_name":  "extended-models-report",
+  "default_lb_method": "independent_edges",
+  "default_ub_method": "vertex",
+  "default_time_limit": 3600,
+  "default_edge_fix": true,
+  "run_configs": [
+    {
+      "graph": "lesmis76.gml",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee300.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "football114.gml",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "rado-emails.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee118.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "surfers.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "ieee30.txt",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "karate34.gml",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "dolphins62.gml",
+      "model": "ExtendedModel"
+    },
+    {
+      "graph": "adjnoun111.gml",
+      "model": "ExtendedModel"
+    }
+  ]
+}

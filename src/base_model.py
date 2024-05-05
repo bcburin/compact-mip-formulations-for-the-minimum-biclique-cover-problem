@@ -10,30 +10,33 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.bc_bounds import LBComputeMethod, UBComputeMethod, find_bc_upper_bound, find_bc_lower_bound
+from src.bc_bounds import find_bc_upper_bound, find_bc_lower_bound
+from src.config import RunConfig, ReportConfig
 
 
 class MBCModel(ABC):
 
-    def __init__(  # TODO: implement bottom-up model
+    def __init__(
              self,
              g: nx.Graph,
              g_name: str,
-             default_lb_method: LBComputeMethod = LBComputeMethod.MATCH,
-             default_ub_method: UBComputeMethod = UBComputeMethod.VERTEX,
-             time_limit: int = None,
+             config: RunConfig,
+             default_config: ReportConfig,
              log_to_console: bool = True,
-             dir_logs: str = None,
-             k: int = None):
+             dir_logs: str = None):
         self.g = g
         self.g_name = g_name
-        self._default_lb_method = default_lb_method
-        self._default_ub_method = default_ub_method
-        self._time_limit = time_limit
+        self._config = config
+        self._default_config = default_config
         self._log_to_console = log_to_console
         self._dir_logs = dir_logs
         self._logging = bool(dir_logs)
-        self.k = k
+        # config properties
+        self._time_limit = self._config.time_limit or self._default_config.default_time_limit
+        self._lb_method = self._config.lb_method or self._default_config.default_lb_method
+        self._ub_method = self._config.ub_method or self._default_config.default_ub_method
+        self._edge_fix = self._config.edge_fix or self._default_config.default_edge_fix
+        self._bottom_up = self._config.bottom_up or self._default_config.default_bottom_up
         # model
         self._init_model()
         # create log files
@@ -44,11 +47,10 @@ class MBCModel(ABC):
         # initial state
         self._solved = False
 
-    def copy(self, k: int = None) -> MBCModel:
-        return self.__class__(
-            g=self.g, g_name=self.g_name, default_lb_method=self._default_lb_method,
-            default_ub_method=self._default_ub_method, time_limit=self._time_limit,
-            log_to_console=self._log_to_console, dir_logs=self._dir_logs, k=k)
+    def _log_message(self, msg: str):
+        msg = f"[{self.__class__.__name__}] " + msg
+        self._log_res.write(msg)
+        print(msg)
 
     def __del__(self):
         if hasattr(self, '_files_open') and self._files_open:
@@ -56,14 +58,14 @@ class MBCModel(ABC):
 
     def _open_files(self, dir_logs: str):
         model_graph_name = self.name() + '_' + self.g_name
-        self.log_grb = open(path.join(dir_logs, model_graph_name + '_gurobi.log'), 'w+')
-        self.log_res = open(path.join(dir_logs, model_graph_name + '_result.log'), 'w+')
-        self._write_headers(self.log_res)
+        self._log_grb = open(path.join(dir_logs, model_graph_name + '_gurobi.log'), 'w+')
+        self._log_res = open(path.join(dir_logs, model_graph_name + '_result.log'), 'w+')
+        self._write_headers(self._log_res)
         self._files_open = True
 
     def _close_files(self):
-        self.log_grb.close()
-        self.log_res.close()
+        self._log_grb.close()
+        self._log_res.close()
 
     def _set_parameters(self):
         if self._time_limit is not None:
@@ -71,7 +73,7 @@ class MBCModel(ABC):
         if not self._log_to_console:
             self.m.Params.LogToConsole = 0
         if self._logging:
-            self.m.Params.LogFile = self.log_grb.name
+            self.m.Params.LogFile = self._log_grb.name
 
     def _init_model(self):
         self.m = gp.Model()
@@ -114,13 +116,13 @@ class MBCModel(ABC):
             return
         if self.m.status == GRB.OPTIMAL:
             # check solution
-            self.log_res.write(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
+            self._log_message(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
         elif self.m.status == GRB.TIME_LIMIT:
-            self.log_res.write(f'Model reached time limit of {self._time_limit} seconds.\n')
+            self._log_message(f'Model reached time limit of {self._time_limit} seconds.\n')
         elif self.m.status == GRB.INFEASIBLE:
-            self.log_res.write('Model is unfeasible.\n')
+            self._log_message('Model is unfeasible.\n')
         else:
-            self.log_res.write(f'Status code: {self.m.status}\n')
+            self._log_message(f'Status code: {self.m.status}\n')
         if self._logging:
             self._close_files()
 
@@ -140,16 +142,12 @@ class MBCModel(ABC):
         return nx.complement(self.directed)
 
     @cache
-    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
-        lb_method = lb_method or self._default_lb_method
-        return int(find_bc_lower_bound(self.g, self._default_lb_method)) if lb_method else 1
+    def lower_bound(self) -> int:
+        return int(find_bc_lower_bound(self.g, self._lb_method)) if self._lb_method else 1
 
     @cache
-    def upper_bound(self, ub_method: UBComputeMethod | None = None) -> int:
-        if self.k:
-            return self.k
-        ub_method = ub_method or self._default_ub_method
-        return int(find_bc_upper_bound(self.g, self._default_ub_method)) if ub_method else 1
+    def upper_bound(self) -> int:
+        return int(find_bc_upper_bound(self.g, self._ub_method)) if self._ub_method else 1
 
     @property
     def bicliques(self) -> Iterable:
@@ -182,7 +180,7 @@ class MBCModel(ABC):
         self._pre_solve()
         # optimization process
         if self._logging:
-            self.log_res.write(f'Solving for graph {self.g_name} ({self.__class__.__name__})...')
+            self._log_message(f'Solving for graph {self.g_name}...')
         self.m.optimize()
         self._solved = True
         # custom post-solve with default implementation
@@ -199,12 +197,12 @@ class BottomUpMBCModel(MBCModel, ABC):
         while True:
             if k > self.upper_bound():
                 return None
-            self.log_res.write(f'Solving for lower bound k={k}.\n')
+            self._log_message(f'Solving for lower bound k={k}.\n')
             model = self.copy(k=k)
             super(BottomUpMBCModel, model).solve()
             if model.m.status == GRB.OPTIMAL:
-                self.log_res.write(f'Found solution for lower bound k={k}: {model.m.objVal}.\n')
+                self._log_message(f'Found solution for lower bound k={k}: {model.m.objVal}.\n')
                 return model.m.objVal
             else:
-                self.log_res.write(f'Infeasible for lower bound k={k}.\n')
+                self._log_message(f'Infeasible for lower bound k={k}.\n')
             k += 1

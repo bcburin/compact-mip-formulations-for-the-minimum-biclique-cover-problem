@@ -90,14 +90,13 @@ class NaturalModel(MBCModel):
                 self.x[b, a, biclique].lb = 1
 
     @cache
-    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
-        lb_method = lb_method or self._default_lb_method
-        if lb_method == LBComputeMethod.INDEPENDENT_EDGES:
+    def lower_bound(self) -> int:
+        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES and self._edge_fix:
             lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
             self._add_independent_edges_constraints(edges=edges)
             return int(lb)
         else:
-            return super().lower_bound(lb_method)
+            return super().lower_bound()
 
     @classmethod
     def name(cls) -> str:
@@ -177,14 +176,13 @@ class ExtendedModel(MBCModel):
             self.x[b, a, biclique].lb = 0
 
     @cache
-    def lower_bound(self, lb_method: LBComputeMethod | None = None) -> int:
-        lb_method = lb_method or self._default_lb_method
-        if lb_method == LBComputeMethod.INDEPENDENT_EDGES:
+    def lower_bound(self) -> int:
+        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES and self._edge_fix:
             lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
             self._add_independent_edges_constraints(edges=edges)
             return int(lb)
         else:
-            return super().lower_bound(lb_method)
+            return super().lower_bound()
 
     @classmethod
     def name(cls) -> str:

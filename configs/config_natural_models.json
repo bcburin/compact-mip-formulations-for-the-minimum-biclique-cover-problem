@@ -1,50 +1,57 @@
-[
-  {
-    "graph": "lesmis76.gml",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "jazz-musicians.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "ieee57.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "ieee300.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "football114.gml",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "rado-emails.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "ieee118.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "surfers.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "ieee30.txt",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "karate34.gml",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "dolphins62.gml",
-    "model": "NaturalModel"
-  },
-  {
-    "graph": "adjnoun111.gml",
-    "model": "NaturalModel"
-  }
-]
+{
+  "report_name":  "natural-models-report",
+  "default_lb_method": "independent_edges",
+  "default_ub_method": "vertex",
+  "default_time_limit": 3600,
+  "default_edge_fix": true,
+  "run_configs": [
+    {
+      "graph": "lesmis76.gml",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "ieee300.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "football114.gml",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "rado-emails.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "ieee118.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "surfers.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "ieee30.txt",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "karate34.gml",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "dolphins62.gml",
+      "model": "NaturalModel"
+    },
+    {
+      "graph": "adjnoun111.gml",
+      "model": "NaturalModel"
+    }
+  ]
+}

@@ -11,17 +11,17 @@ import cvxpy as cp
 from src.util import get_graphs_in_store, GraphReport
 
 
-class LBComputeMethod(Enum):
-    MATCH = auto()
-    LOVASZ = auto()
-    CLIQUE = auto()
-    INDEPENDENT_EDGES = auto()
-    MAXIMAL_INDEPENDENT_SET = auto()
+class LBComputeMethod(str, Enum):
+    MATCH = 'match'
+    LOVASZ = 'lovasz'
+    CLIQUE = 'clique'
+    INDEPENDENT_EDGES = 'independent_edges'
+    MAXIMAL_INDEPENDENT_SET = 'maximal_independent_set'
 
 
-class UBComputeMethod(Enum):
-    NUMBER = auto()
-    VERTEX = auto()
+class UBComputeMethod(str, Enum):
+    NUMBER = 'number'
+    VERTEX = 'vertex'
 
 
 def count_cliques(g: nx.Graph, timeout: int = None, size_limit: int = None, verification_interval: int = 1000) -> int:

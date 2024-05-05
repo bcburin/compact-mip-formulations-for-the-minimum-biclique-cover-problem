@@ -1,4 +1,3 @@
-import json
 import math
 from datetime import datetime
 from os import path, listdir, getcwd, pardir, mkdir, remove
@@ -12,7 +11,6 @@ from typing import Callable, TypeVar, Iterable
 import networkx as nx
 from networkx import Graph
 from pandas import DataFrame
-from pydantic import BaseModel, ValidationError, parse_obj_as
 
 ReturnType = TypeVar('ReturnType')
 
@@ -297,23 +295,13 @@ def get_logs_directory(name: str):
     return dir_ts_logs
 
 
-class RunConfig(BaseModel):
-    graph: str
-    model: str
-    lb_method: str = "INDEPENDENT_EDGES"
-    ub_method: str = "VERTEX"
-
-
-def read_run_config_file(config_file_path: str) -> list[RunConfig]:
-    with open(config_file_path, 'r') as config_file:
-        run_config_data = json.load(config_file)
-
-    try:
-        run_configs = parse_obj_as(list[RunConfig], run_config_data)
-        return run_configs
-    except ValidationError as e:
-        for error in e.errors():
-            print(error['msg'])
+def get_and_create_logs_dir():
+    current_dir = path.dirname(path.abspath(__file__))
+    dir_parent = path.abspath(path.join(current_dir, pardir))
+    dir_logs = path.join(dir_parent, 'logs')
+    if not path.isdir(dir_logs):
+        mkdir(dir_logs)
+    return dir_logs
 
 
 def is_biclique(graph: Graph, edges: list):
@@ -454,7 +442,8 @@ class GraphReport:
         if not self._finished_setup or not self._data:
             raise RuntimeError('No data to save.')
         if not all(self._props.values()):
-            raise RuntimeError(f'Not all properties have been filled in row {self._rows}. \n _data={pprint(self._data)}')
+            raise RuntimeError(
+                f'Not all properties have been filled in row {self._rows}. \n _data={pprint(self._data)}')
         return DataFrame(data=self._data, **kwargs)
 
     def _cleanup_rows(self):
