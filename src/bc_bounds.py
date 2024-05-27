@@ -22,6 +22,7 @@ class LBComputeMethod(str, Enum):
 class UBComputeMethod(str, Enum):
     NUMBER = 'number'
     VERTEX = 'vertex'
+    MERGE_STARS = 'merge_stars'
 
 
 def count_cliques(g: nx.Graph, timeout: int = None, size_limit: int = None, verification_interval: int = 1000) -> int:
@@ -96,7 +97,7 @@ def max_clique(g: nx.Graph) -> int:
         # optimize
         m.optimize()
 
-        if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
+        if m.status != GRB.INFEASIBLE:
             return m.objVal
         else:
             print("There is an error in the maximum clique problem!")
@@ -138,7 +139,7 @@ def compute_lb_and_get_edges_by_independent_edges_method(
     # solve model
     m.optimize()
     # return values
-    if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
+    if m.status != GRB.INFEASIBLE:
         edges = [e for e in g.edges if y[e].X == 1]
         return m.objVal, edges
     else:
@@ -153,11 +154,14 @@ def find_bc_upper_bound(g: nx.Graph, method: UBComputeMethod = UBComputeMethod.N
             return n + 1 - np.floor(np.log2(n))
         case UBComputeMethod.VERTEX:
             return vertex_cover(g, time_limit=time_limit, memory_limit=memory_limit)
+        case UBComputeMethod.MERGE_STARS:
+            bicliques = merge_stars(g)
+            return len(bicliques)
         case _:
             raise ValueError("Unsupported Method")
 
 
-def vertex_cover(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> int:
+def get_vertex_cover_solution(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> tuple[list, int]:
     try:
         # define model
         m = gp.Model()
@@ -178,8 +182,9 @@ def vertex_cover(g: nx.Graph, time_limit: int = None, memory_limit: int = None) 
         # optimize
         m.optimize()
 
-        if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
-            return m.objVal
+        if m.status != GRB.INFEASIBLE:
+            t = [vertex for vertex in g.nodes if x[vertex].X > 0.5]
+            return t, m.objVal
         else:
             print("There is an error in the vertex cover problem!")
 
@@ -189,12 +194,46 @@ def vertex_cover(g: nx.Graph, time_limit: int = None, memory_limit: int = None) 
         print('Encountered an attribute error')
 
 
+def vertex_cover(g: nx.Graph, time_limit: int = None, memory_limit: int = None) -> int:
+    _, val = get_vertex_cover_solution(g, time_limit, memory_limit)
+    return val
+
+
+def merge_stars(g: nx.Graph, t: gp.Model = None) -> list:
+    if t is None:
+        t, _ = get_vertex_cover_solution(g)
+    g2 = nx.power(g, k=2)
+    for vertex in g2.nodes:
+        g2.nodes[vertex]['cover'] = False
+    for vertex in t:
+        g2.nodes[vertex]['cover'] = True
+    biclique_cover = []
+    for u, v in g2.edges:
+        if g.has_edge(u, v):
+            continue
+        if not g2.nodes[u]['cover'] or not g2.nodes[v]['cover']:
+            continue
+        u_neighbor_set = set(g.neighbors(u))
+        v_neighbor_set = set(g.neighbors(v))
+        if u_neighbor_set.issubset(v_neighbor_set):
+            biclique_cover.append(set(g.edges(u)) | {(q, v) for q in nx.common_neighbors(g, u, v)})
+            g2.nodes[u]['cover'] = False
+        if v_neighbor_set.issubset(u_neighbor_set):
+            biclique_cover.append(set(g.edges(v)) | {(q, u) for q in nx.common_neighbors(g, u, v)})
+            g2.nodes[v]['cover'] = False
+    for vertex in g2.nodes:
+        if not g2.nodes[vertex]['cover']:
+            continue
+        biclique_cover.append(set(g.edges(vertex)))
+    return biclique_cover
+
+
 if __name__ == "__main__":
-    model_time_limit = 60
+    model_time_limit = None
     model_memory_limit = 4
     report = GraphReport('bounds')
     report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
-    report.add_properties([str(method) for method in UBComputeMethod])
+    # report.add_properties([str(method) for method in UBComputeMethod])
     # iterate graphs
     for g, g_name in get_graphs_in_store(recursive=False):
         report.add_graph_data(g, g_name)
@@ -205,8 +244,8 @@ if __name__ == "__main__":
             report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g,
                                                      method=method, time_limit=model_time_limit,
                                                      memory_limit=model_memory_limit)
-        for method in UBComputeMethod:
-            report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
-                                                     method=method, time_limit=model_time_limit,
-                                                     memory_limit=model_memory_limit)
+        # for method in UBComputeMethod:
+        #     report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
+        #                                              method=method, time_limit=model_time_limit,
+        #                                              memory_limit=model_memory_limit)
     report.save_csv()
