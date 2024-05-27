@@ -82,12 +82,18 @@ class NaturalModel(MBCModel):
         return True
 
     def _do_warm_start(self, indep_edges: list, vertex_cover: list):
-        match = {e: set(s for s in vertex_cover if s == e[0] or s == e[1]) for e in indep_edges}
-        for i, e in enumerate(match.keys()):
-            self.x[min(e), max(e), i].lb = 1
-            for s in match[e]:
-                for se in self.g.edges(s):
-                    self.x[min(se), max(se), i].start = 1
+        assign = dict()
+        for i, s in enumerate(vertex_cover):
+            edges = []
+            for e in self.g.edges(s):
+                self.x[min(e), max(e), i].start = 1
+                edges.append(e)
+            assign[i] = edges
+        indep_edges = set(indep_edges)
+        for i in assign.keys():
+            for e in assign[i]:
+                if e in indep_edges:
+                    self.x[min(e), max(e), i].lb = 1
 
     def _can_add_indep_edges_constraints(self) -> bool:
         return self._indep_edges is not None and self._edge_fix and not self._warm_start
