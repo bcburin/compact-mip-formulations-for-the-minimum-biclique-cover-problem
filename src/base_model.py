@@ -36,6 +36,7 @@ class MBCModel(ABC):
         self._lb_method = self._config.lb_method or self._default_config.default_lb_method
         self._ub_method = self._config.ub_method or self._default_config.default_ub_method
         self._edge_fix = self._config.edge_fix or self._default_config.default_edge_fix
+        self._warm_start = self._config.warm_start or self._default_config.default_warm_start
         self._bottom_up = self._config.bottom_up or self._default_config.default_bottom_up
         # model
         self._init_model()
@@ -183,6 +184,7 @@ class MBCModel(ABC):
             self._log_message(f'Solving for graph {self.g_name}...')
         self.m.optimize()
         self._solved = True
+        self.m.write("out.lp")
         # custom post-solve with default implementation
         self._post_solve()
         # return obj val

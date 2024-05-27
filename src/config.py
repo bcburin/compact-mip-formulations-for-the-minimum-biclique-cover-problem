@@ -12,6 +12,7 @@ class RunConfig(BaseModel):
     ub_method: UBComputeMethod = UBComputeMethod.VERTEX
     edge_fix: bool = True
     bottom_up: bool = False
+    warm_start: bool = True
     time_limit: int | None = None
 
 
@@ -20,6 +21,7 @@ class ReportConfig(BaseModel):
     default_lb_method: LBComputeMethod = LBComputeMethod.INDEPENDENT_EDGES
     default_ub_method: UBComputeMethod = UBComputeMethod.VERTEX
     default_edge_fix: bool = True
+    default_warm_start: bool = True
     default_bottom_up: bool = False
     default_time_limit: int | None = 3600
     run_configs: list[RunConfig]
