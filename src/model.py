@@ -184,6 +184,12 @@ class ExtendedModel(MBCModel):
             m.addConstrs(y[v, i, 0] + y[u, i, 1] <= z[i] for i in self.bicliques)
         # 5g
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+        # conflict inequalities
+        if self._conflict_inequalities:
+            self._add_conflict_inequalities()
+        # common neighbors inequalities
+        if self._common_neighbor_inequalities:
+            self._add_common_neighbor_inequalities()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
@@ -210,6 +216,25 @@ class ExtendedModel(MBCModel):
             a, b = edges[biclique]
             self.x[a, b, biclique].lb = 1
             self.x[b, a, biclique].lb = 0
+
+    def _add_conflict_inequalities(self):
+        for u, v in combinations(self.g.nodes, r=2):
+            if self.power_graph.has_edge(u, v):
+                continue
+            self.m.addConstrs(self.y[u, i, 0] + self.y[u, i, 1] + self.y[v, i, 0] + self.y[v, i, 1] <= self.z[i]
+                              for i in self.bicliques)
+
+    def _add_common_neighbor_inequalities(self):
+        for u, v in self.power_graph.edges:
+            if self.g.has_edge(u, v):
+                continue
+            common_neighbors = nx.common_neighbors(self.g, u, v)
+            self.m.addConstrs(
+                self.y[u, i, 0] + self.y[v, i, 0] <= self.z[i] + gp.quicksum(self.y[c, i, 0] for c in common_neighbors)
+                for i in self.bicliques)
+            self.m.addConstrs(
+                self.y[u, i, 1] + self.y[v, i, 1] <= self.z[i] + gp.quicksum(self.y[c, i, 1] for c in common_neighbors)
+                for i in self.bicliques)
 
     @cache
     def lower_bound(self) -> int:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from functools import cache
+from functools import cache, cached_property
 from itertools import combinations
 
 from os import path
@@ -38,6 +38,10 @@ class MBCModel(ABC):
         self._edge_fix = self._config.edge_fix or self._default_config.default_edge_fix
         self._warm_start = self._config.warm_start or self._default_config.default_warm_start
         self._bottom_up = self._config.bottom_up or self._default_config.default_bottom_up
+        self._conflict_inequalities = (
+                self._config.conflict_inequalities or self._default_config.default_conflict_inequalities)
+        self._common_neighbor_inequalities = (
+                self._config.common_neighbor_inequalities or self._default_config.default_common_neighbor_inequalities)
         # model
         self._init_model()
         # create log files
@@ -132,15 +136,17 @@ class MBCModel(ABC):
     def directed(self) -> nx.DiGraph:
         return nx.DiGraph(self.g)
 
-    @property
-    @cache
+    @cached_property
     def complement(self) -> nx.Graph:
         return nx.complement(self.g)
 
-    @property
-    @cache
+    @cached_property
     def directed_complement(self) -> nx.Graph:
         return nx.complement(self.directed)
+
+    @cached_property
+    def power_graph(self) -> nx.Graph:
+        return nx.power(self.g, k=2)
 
     @cache
     def lower_bound(self) -> int:
