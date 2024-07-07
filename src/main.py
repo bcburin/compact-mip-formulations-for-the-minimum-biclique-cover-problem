@@ -11,8 +11,7 @@ import src.model as model_classes
 def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
     # create logs directory
     dir_logs = get_and_create_logs_dir()
-    ts = int(datetime.now().timestamp())
-    dir_ts_logs = path.join(dir_logs, config.report_name + '-' + str(ts))
+    dir_ts_logs = path.join(dir_logs, config.resolved_report_name)
     mkdir(dir_ts_logs)
 
     # constant strings
@@ -23,7 +22,7 @@ def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
     str_ub = 'UB'
     str_time = 'time'
     # create report
-    report = GraphReport(name=config.report_name)
+    report = GraphReport(name=config.resolved_report_name)
     report.add_properties([str_model, str_k, str_time_k, str_lb, str_ub, str_time], add_time_property=False)
     # runs from configuration
     try:
@@ -31,7 +30,8 @@ def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
             g = get_graph_in_store(filename=run_config.graph)
             g_name, _ = get_file_name_and_extension(fname=run_config.graph)
             run_model = getattr(model_classes, run_config.model)
-            model = run_model(g=g, g_name=g_name, dir_logs=dir_ts_logs, config=run_config, default_config=config)
+            model = run_model(
+                g=g, g_name=run_config.resolved_gname, dir_logs=dir_ts_logs, config=run_config, default_config=config)
             # calculate values
             try:
                 k, t_k = chronometer(model.upper_bound)
@@ -41,7 +41,7 @@ def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
                 print(f'Error running {run_config}: {e}')
                 continue
             # add values to report
-            report.add_graph_data(g, g_name)
+            report.add_graph_data(g, run_config.resolved_gname)
             report.add_property_values(p_name=str_model, p_value=run_config.model)
             report.add_property_values(p_name=str_k, p_value=k)
             report.add_property_values(p_name=str_time_k, p_value=t_k)
