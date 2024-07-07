@@ -1,9 +1,10 @@
 {
-  "report_name":  "natural-models-report",
+  "report_name":  "natural-models-report-$ts",
   "default_lb_method": "independent_edges",
   "default_ub_method": "vertex",
   "default_time_limit": 3600,
   "default_edge_fix": true,
+  "default_warm_start": true,
   "run_configs": [
     {
       "graph": "lesmis76.gml",

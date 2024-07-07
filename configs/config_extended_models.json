@@ -1,5 +1,5 @@
 {
-  "report_name":  "extended-models-report",
+  "report_name":  "extended-models-report-$ts",
   "default_lb_method": "independent_edges",
   "default_ub_method": "vertex",
   "default_time_limit": 3600,
