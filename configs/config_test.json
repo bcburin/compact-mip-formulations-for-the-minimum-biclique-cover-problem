@@ -1,32 +1,45 @@
 {
-  "report_name":  "test-ieee-conflict-and-common-neighbors",
+  "report_name":  "test-natural-models-with-callbacks-$ts",
   "default_lb_method": "independent_edges",
   "default_ub_method": "vertex",
   "default_time_limit": 300,
+  "default_edge_fix": true,
   "run_configs": [
     {
-      "graph": "ieee30.txt",
+      "graph": "karate34.gml",
       "model": "ExtendedModel",
-      "conflict_inequalities": false,
-      "common_neighbor_inequalities": false
+      "name": "$graph - without callback",
+      "use_callback": false
+    },
+    {
+      "graph": "karate34.gml",
+      "model": "ExtendedModel",
+      "name": "$graph - with callback",
+      "use_callback": true
     },
     {
       "graph": "ieee30.txt",
       "model": "ExtendedModel",
-      "conflict_inequalities": true,
-      "common_neighbor_inequalities": false
+      "name": "$graph - without callback",
+      "use_callback": false
     },
     {
       "graph": "ieee30.txt",
       "model": "ExtendedModel",
-      "conflict_inequalities": false,
-      "common_neighbor_inequalities": true
+      "name": "$graph - with callback",
+      "use_callback": true
     },
     {
-      "graph": "ieee30.txt",
+      "graph": "ieee57.txt",
       "model": "ExtendedModel",
-      "conflict_inequalities": true,
-      "common_neighbor_inequalities": true
+      "name": "$graph - without callback",
+      "use_callback": false
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "ExtendedModel",
+      "name": "$graph - with callback",
+      "use_callback": true
     }
   ]
 }

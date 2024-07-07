@@ -10,7 +10,8 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.bc_bounds import find_bc_upper_bound, find_bc_lower_bound
+from src.bc_bounds import find_bc_upper_bound, find_bc_lower_bound, UBComputeMethod, get_vertex_cover_solution, \
+    LBComputeMethod, compute_lb_and_get_edges_by_independent_edges_method
 from src.config import RunConfig, ReportConfig
 
 
@@ -42,6 +43,9 @@ class MBCModel(ABC):
                 self._config.conflict_inequalities or self._default_config.default_conflict_inequalities)
         self._common_neighbor_inequalities = (
                 self._config.common_neighbor_inequalities or self._default_config.default_common_neighbor_inequalities)
+        self._use_callback = self._config.use_callback or self._default_config.default_use_callback
+        # Usable data
+        self._callback = None
         # model
         self._init_model()
         # create log files
@@ -149,12 +153,30 @@ class MBCModel(ABC):
         return nx.power(self.g, k=2)
 
     @cache
+    def get_lb_and_indep_edges(self) -> tuple[int, list[tuple[int, int]]]:
+        lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
+        return int(lb), edges
+
+    @cache
+    def get_ub_and_vertex_cover(self) -> tuple[int, list[int]]:
+        t, ub = get_vertex_cover_solution(g=self.g)
+        return int(ub), t
+
+    @cache
     def lower_bound(self) -> int:
-        return int(find_bc_lower_bound(self.g, self._lb_method)) if self._lb_method else 1
+        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES:
+            lb, _ = self.get_lb_and_indep_edges()
+            return lb
+        else:
+            return int(find_bc_lower_bound(self.g, self._lb_method)) if self._lb_method else 1
 
     @cache
     def upper_bound(self) -> int:
-        return int(find_bc_upper_bound(self.g, self._ub_method)) if self._ub_method else 1
+        if self._ub_method == UBComputeMethod.VERTEX:
+            ub, _ = self.get_ub_and_vertex_cover()
+            return ub
+        else:
+            return int(find_bc_upper_bound(self.g, self._ub_method)) if self._ub_method else self.g.edges
 
     @property
     def bicliques(self) -> Iterable:
@@ -179,6 +201,10 @@ class MBCModel(ABC):
                 disjoint_edges.add((e, f, cr1, cr2))
         return disjoint_edges
 
+    def _can_add_indep_edges_constraints(self) -> bool:
+        _, indep_edges = self.get_lb_and_indep_edges()
+        return bool(indep_edges) and self._edge_fix and not self._warm_start
+
     def infeasible_or_unsolved(self) -> bool:
         return self.m.status in [GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.INTERRUPTED, GRB.LOADED]
 
@@ -188,7 +214,11 @@ class MBCModel(ABC):
         # optimization process
         if self._logging:
             self._log_message(f'Solving for graph {self.g_name}...')
-        self.m.optimize()
+        if self._callback is not None:
+            # noinspection PyArgumentList
+            self.m.optimize(self._callback)
+        else:
+            self.m.optimize()
         self._solved = True
         self.m.write("out.lp")
         # custom post-solve with default implementation
@@ -196,21 +226,3 @@ class MBCModel(ABC):
         # return obj val
         if not self.infeasible_or_unsolved():
             return self.m.objVal
-
-
-class BottomUpMBCModel(MBCModel, ABC):
-
-    def solve(self) -> float | None:
-        k = self.lower_bound()
-        while True:
-            if k > self.upper_bound():
-                return None
-            self._log_message(f'Solving for lower bound k={k}.\n')
-            model = self.copy(k=k)
-            super(BottomUpMBCModel, model).solve()
-            if model.m.status == GRB.OPTIMAL:
-                self._log_message(f'Found solution for lower bound k={k}: {model.m.objVal}.\n')
-                return model.m.objVal
-            else:
-                self._log_message(f'Infeasible for lower bound k={k}.\n')
-            k += 1

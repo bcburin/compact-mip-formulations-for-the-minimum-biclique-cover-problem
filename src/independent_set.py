@@ -5,7 +5,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import networkx as nx
 
-from src.util import chronometer, poisson, save_graph_in_store
+from src.util import chronometer, poisson, save_graph_in_store, get_graphs_in_store
 
 
 def solve(g):
@@ -29,6 +29,26 @@ def solve(g):
 
 
 SetOfSets = frozenset[frozenset[int]]
+
+
+def solve_max_weighted_independent_set(g: nx.Graph, g2: nx.Graph) -> tuple[float, list[int]]:
+    m = gp.Model()
+    # find power graph g^2
+    H = g2
+    # define vars
+    X = m.addVars(H.nodes, vtype=GRB.BINARY, name="x")
+    # define objective function with weights
+    m.setObjective(gp.quicksum(g.nodes[v]["weight"] * X[v] for v in H.nodes), sense=GRB.MAXIMIZE)
+    # add covering constraints
+    m.addConstrs(X[u] + X[v] <= 1 for u, v in H.edges)
+    # set a one-minute time limit
+    m.Params.TimeLimit = 60
+    # optimize
+    m.optimize()
+    if m.status == GRB.OPTIMAL or m.status == GRB.TIME_LIMIT:
+        return m.objVal, [v for v in H.nodes if X[v].X > 0.5]
+    else:
+        print("There is an error in the maximum weighted independent set problem!")
 
 
 def get_set_of_maximal_independent_sets(g: nx.Graph):
@@ -110,5 +130,12 @@ def generate_and_save_random_graphs_from_indep_sets(
 
 
 if __name__ == '__main__':
-    generate_and_save_random_graphs_from_indep_sets(
-        min_n_sets=2, max_n_sets=6, min_n_vertices=10, max_n_vertices=60, step_n_vertices=10)
+    from src.model import NaturalModel
+
+    for g, g_name in get_graphs_in_store(
+            fname_regex="from_indep_sets_10_35_297.gml",
+            graph_dir='/home/bcburin/Git/biclique_milp/graph/from-indep-sets'):
+        model = NaturalModel(g=g, g_name=g_name)
+        model.solve()
+
+

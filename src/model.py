@@ -1,22 +1,37 @@
-from functools import cache
 from itertools import combinations
 
 import gurobipy as gp
 import networkx as nx
-from gurobipy import GRB, Var
+from gurobipy import GRB
 
-from src.base_model import MBCModel, BottomUpMBCModel
-from src.bc_bounds import LBComputeMethod, compute_lb_and_get_edges_by_independent_edges_method, \
-    get_vertex_cover_solution, UBComputeMethod
+from src.base_model import MBCModel
+from src.independent_set import solve_max_weighted_independent_set
 from src.util import is_biclique, var_swap
 
 
-class NaturalModel(MBCModel):
+def indep_callback(model: gp.Model, where: int):
+    """
+    :param model: Gurobi model, expects the following variables to be added:
+        - _g containing the graph of the model;
+        - _g2 containing the power graph g^2; and
+        - _k storing the calculated maximum number of bicliques.
+        - _Y variable of the extended model
+        - _z variable of the extended model
+    :param where: Gurobi internal variable that represent place where the callback function was called.
+    """
+    if where != GRB.Callback.MIPNODE or model.cbGet(GRB.Callback.MIPNODE_STATUS) != GRB.OPTIMAL:
+        return
+    y_val = model.cbGetNodeRel(model._y)
+    z_val = model.cbGetNodeRel(model._z)
+    for j in range(model._k):
+        for v in model._g.nodes:
+            model._g.nodes[v]["weight"] = y_val[v, j, 0] + y_val[v, j, 1]
+        obj, indep_set = solve_max_weighted_independent_set(model._g, model._g2)
+        if obj > z_val[j]:
+            model.cbCut(gp.quicksum(model._y[v, j, 0] + model._y[v, j, 1] for v in indep_set) <= model._z[j])
 
-    def __init__(self, *args, **kwargs):
-        self._vertex_cover_solution = []
-        self._indep_edges = []
-        super().__init__(*args, **kwargs)
+
+class NaturalModel(MBCModel):
 
     def _add_variables(self):
         # 4j
@@ -67,6 +82,9 @@ class NaturalModel(MBCModel):
                     z[i] + var_swap(x, b, c, i) + var_swap(x, b, d, i) for i in self.bicliques)
         # 4i
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+        # independent edges constraints
+        if self._can_add_indep_edges_constraints():
+            self._add_independent_edges_constraints()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
@@ -95,59 +113,25 @@ class NaturalModel(MBCModel):
                 if e in indep_edges:
                     self.x[min(e), max(e), i].lb = 1
 
-    def _can_add_indep_edges_constraints(self) -> bool:
-        return self._indep_edges is not None and self._edge_fix and not self._warm_start
-
-    def _can_warm_start(self) -> bool:
-        return self._indep_edges is not None and self._vertex_cover_solution is not None and self._warm_start
-
     def _pre_solve(self):
         for b in range(self.lower_bound()):
             self.z[b].lb = 1
-        if self._can_add_indep_edges_constraints():
-            self._add_independent_edges_constraints(self._indep_edges)
-        if self._can_warm_start():
-            self._do_warm_start(indep_edges=self._indep_edges, vertex_cover=self._vertex_cover_solution)
+        if self._warm_start:
+            _, indep_edges = self.get_lb_and_indep_edges()
+            _, vertex_cover = self.get_ub_and_vertex_cover()
+            self._do_warm_start(indep_edges=indep_edges, vertex_cover=vertex_cover)
 
-    def _add_independent_edges_constraints(self, edges: list[Var]):
+    def _add_independent_edges_constraints(self):
+        _, edges = self.get_lb_and_indep_edges()
         for biclique in self.bicliques:
             if biclique >= len(edges):
                 return
             e = edges[biclique]
             self.x[min(e), max(e), biclique].lb = 1
 
-    @cache
-    def lower_bound(self) -> int:
-        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES:
-            lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
-            self._indep_edges = edges
-            return int(lb)
-        else:
-            return super().lower_bound()
-
-    @cache
-    def upper_bound(self) -> int:
-        if self._ub_method == UBComputeMethod.VERTEX:
-            t, ub = get_vertex_cover_solution(g=self.g)
-            self._vertex_cover_solution = t
-            return int(ub)
-        else:
-            return super().upper_bound()
-
     @classmethod
     def name(cls) -> str:
         return 'Compact Natural Model'
-
-
-class BottomUpNaturalModel(NaturalModel, BottomUpMBCModel):
-
-    def _pre_solve(self):
-        for b in range(self.upper_bound()):
-            self.z[b].lb = 1
-
-    @classmethod
-    def name(cls) -> str:
-        return 'Bottom-up Natural Model'
 
 
 class ExtendedModel(MBCModel):
@@ -184,6 +168,9 @@ class ExtendedModel(MBCModel):
             m.addConstrs(y[v, i, 0] + y[u, i, 1] <= z[i] for i in self.bicliques)
         # 5g
         m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+        # independent edges constraints
+        if self._can_add_indep_edges_constraints():
+            self._add_independent_edges_constraints()
         # conflict inequalities
         if self._conflict_inequalities:
             self._add_conflict_inequalities()
@@ -208,8 +195,11 @@ class ExtendedModel(MBCModel):
     def _pre_solve(self):
         for b in range(self.lower_bound()):
             self.z[b].lb = 1
+        if self._use_callback:
+            self._add_callback()
 
-    def _add_independent_edges_constraints(self, edges: list[Var]):
+    def _add_independent_edges_constraints(self):
+        _, edges = self.get_lb_and_indep_edges()
         for biclique in self.bicliques:
             if biclique >= len(edges):
                 return
@@ -221,8 +211,11 @@ class ExtendedModel(MBCModel):
         for u, v in combinations(self.g.nodes, r=2):
             if self.power_graph.has_edge(u, v):
                 continue
-            self.m.addConstrs(self.y[u, i, 0] + self.y[u, i, 1] + self.y[v, i, 0] + self.y[v, i, 1] <= self.z[i]
-                              for i in self.bicliques)
+            conflict_inequalities = self.m.addConstrs(
+                self.y[u, i, 0] + self.y[u, i, 1] + self.y[v, i, 0] + self.y[v, i, 1] <= self.z[i]
+                for i in self.bicliques)
+            for i in self.bicliques:
+                conflict_inequalities[i].Lazy = 1
 
     def _add_common_neighbor_inequalities(self):
         for u, v in self.power_graph.edges:
@@ -230,32 +223,20 @@ class ExtendedModel(MBCModel):
                 continue
             common_neighbors = nx.common_neighbors(self.g, u, v)
             self.m.addConstrs(
-                self.y[u, i, 0] + self.y[v, i, 0] <= self.z[i] + gp.quicksum(self.y[c, i, 0] for c in common_neighbors)
+                self.y[u, i, 0] + self.y[v, i, 0] <= self.z[i] + gp.quicksum(self.y[c, i, 1] for c in common_neighbors)
                 for i in self.bicliques)
             self.m.addConstrs(
-                self.y[u, i, 1] + self.y[v, i, 1] <= self.z[i] + gp.quicksum(self.y[c, i, 1] for c in common_neighbors)
+                self.y[u, i, 1] + self.y[v, i, 1] <= self.z[i] + gp.quicksum(self.y[c, i, 0] for c in common_neighbors)
                 for i in self.bicliques)
 
-    @cache
-    def lower_bound(self) -> int:
-        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES and self._edge_fix:
-            lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
-            self._add_independent_edges_constraints(edges=edges)
-            return int(lb)
-        else:
-            return super().lower_bound()
+    def _add_callback(self):
+        self.m._k = self.upper_bound()
+        self.m._y = self.y
+        self.m._z = self.z
+        self.m._g = self.g
+        self.m._g2 = self.power_graph
+        self._callback = indep_callback
 
     @classmethod
     def name(cls) -> str:
         return 'Extended Model'
-
-
-class BottomUpExtendedModel(ExtendedModel, BottomUpMBCModel):
-
-    def _pre_solve(self):
-        for b in range(self.upper_bound()):
-            self.z[b].lb = 1
-
-    @classmethod
-    def name(cls) -> str:
-        return "Bottom-up Extended Model"
