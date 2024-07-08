@@ -1,0 +1,141 @@
+{
+  "report_name":  "compare-edge-fix-natural-model-$ts",
+  "default_lb_method": "independent_edges",
+  "default_ub_method": "vertex",
+  "default_time_limit": 3600,
+  "default_warm_start": false,
+  "run_configs": [
+    {
+      "graph": "ieee30.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "ieee30.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "karate34.gml",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "karate34.gml",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "surfers.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "surfers.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "ieee57.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "dolphins62.gml",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "dolphins62.gml",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "lesmis76.gml",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "lesmis76.gml",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "adjnoun111.gml",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "adjnoun111.gml",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "football114.gml",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "football114.gml",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "ieee118.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "ieee118.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    },
+    {
+      "graph": "ieee300.txt",
+      "model": "NaturalModel",
+      "name": "$graph - without edge fix",
+      "edge_fix": false
+    },
+    {
+      "graph": "ieee300.txt",
+      "model": "NaturalModel",
+      "name": "$graph - with edge fix",
+      "edge_fix": true
+    }
+  ]
+}

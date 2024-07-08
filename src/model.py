@@ -108,10 +108,11 @@ class NaturalModel(MBCModel):
                 edges.append(e)
             assign[i] = edges
         indep_edges = set(indep_edges)
-        for i in assign.keys():
-            for e in assign[i]:
-                if e in indep_edges:
-                    self.x[min(e), max(e), i].lb = 1
+        if self._edge_fix:
+            for i in assign.keys():
+                for e in assign[i]:
+                    if e in indep_edges:
+                        self.x[min(e), max(e), i].lb = 1
 
     def _pre_solve(self):
         for b in range(self.lower_bound()):
@@ -197,6 +198,10 @@ class ExtendedModel(MBCModel):
             self.z[b].lb = 1
         if self._use_callback:
             self._add_callback()
+        if self._warm_start:
+            _, indep_edges = self.get_lb_and_indep_edges()
+            _, vertex_cover = self.get_ub_and_vertex_cover()
+            self._do_warm_start(indep_edges=indep_edges, vertex_cover=vertex_cover)
 
     def _add_independent_edges_constraints(self):
         _, edges = self.get_lb_and_indep_edges()
@@ -228,6 +233,33 @@ class ExtendedModel(MBCModel):
             self.m.addConstrs(
                 self.y[u, i, 1] + self.y[v, i, 1] <= self.z[i] + gp.quicksum(self.y[c, i, 0] for c in common_neighbors)
                 for i in self.bicliques)
+
+    def _do_warm_start(self, indep_edges: list, vertex_cover: list):
+        assign = dict()
+        for i, s in enumerate(vertex_cover):
+            edges = []
+            for e in self.g.edges(s):
+                a, b = e
+                self.x[a, b, i].start = 1
+                self.x[b, a, i].start = 0
+                self.y[a, i, 0].start = 1
+                self.y[a, i, 1].start = 0
+                self.y[b, i, 1].start = 1
+                self.y[b, i, 0].start = 0
+                edges.append(e)
+            assign[i] = edges
+        indep_edges = set(indep_edges)
+        if self._edge_fix:
+            for i in assign.keys():
+                for e in assign[i]:
+                    if e in indep_edges:
+                        a, b = e
+                        self.x[a, b, i].lb = 1
+                        self.x[b, a, i].ub = 0
+                        self.y[a, i, 0].lb = 1
+                        self.y[a, i, 1].ub = 0
+                        self.y[b, i, 1].lb = 1
+                        self.y[b, i, 0].ub = 0
 
     def _add_callback(self):
         self.m._k = self.upper_bound()
