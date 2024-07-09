@@ -14,12 +14,12 @@ class RunConfig(BaseModel):
     model: str
     lb_method: LBComputeMethod = LBComputeMethod.INDEPENDENT_EDGES
     ub_method: UBComputeMethod = UBComputeMethod.VERTEX
-    edge_fix: bool = False
-    bottom_up: bool = False
-    warm_start: bool = False
-    conflict_inequalities: bool = False
-    common_neighbor_inequalities: bool = False
-    use_callback: bool = False
+    edge_fix: bool | None = None
+    bottom_up: bool | None = None
+    warm_start: bool | None = None
+    conflict_inequalities: bool | None = None
+    common_neighbor_inequalities: bool | None = None
+    use_callback: bool | None = None
     time_limit: int | None = None
 
     @property

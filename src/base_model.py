@@ -33,18 +33,32 @@ class MBCModel(ABC):
         self._dir_logs = dir_logs
         self._logging = bool(dir_logs)
         # config properties
-        self._time_limit = self._config.time_limit or self._default_config.default_time_limit
+        self._time_limit = (
+            self._config.time_limit) \
+            if self._config.time_limit is not None \
+            else self._default_config.default_time_limit
         self._lb_method = self._config.lb_method or self._default_config.default_lb_method
         self._ub_method = self._config.ub_method or self._default_config.default_ub_method
-        self._edge_fix = self._config.edge_fix or self._default_config.default_edge_fix
-        self._warm_start = self._config.warm_start or self._default_config.default_warm_start
-        self._bottom_up = self._config.bottom_up or self._default_config.default_bottom_up
+        self._edge_fix = (
+            self._config.edge_fix) \
+            if self._config.edge_fix is not None \
+            else self._default_config.default_edge_fix
+        self._warm_start = (
+            self._config.warm_start) \
+            if self._config.warm_start is not None \
+            else self._default_config.default_warm_start
         self._conflict_inequalities = (
-                self._config.conflict_inequalities or self._default_config.default_conflict_inequalities)
+            self._config.conflict_inequalities
+            if self._config.conflict_inequalities is not None
+            else self._default_config.default_conflict_inequalities)
         self._common_neighbor_inequalities = (
-                self._config.common_neighbor_inequalities or self._default_config.default_common_neighbor_inequalities)
-        self._use_callback = self._config.use_callback or self._default_config.default_use_callback
-        # Usable data
+            self._config.common_neighbor_inequalities
+            if self._config.common_neighbor_inequalities is not None
+            else self._default_config.default_common_neighbor_inequalities)
+        self._use_callback = (
+            self._config.use_callback) \
+            if self._config.use_callback is not None else (
+            self._default_config.default_use_callback)
         self._callback = None
         # model
         self._init_model()
