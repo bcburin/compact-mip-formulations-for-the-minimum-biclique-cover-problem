@@ -2,6 +2,8 @@
 
 This is the GitHub repository for the paper ``Compact MIP Formulations for the Minimum Biclique Cover Problem'' by Bruno Burin, Hamidreza Validi, Bochuan Lyu, and Illya V. Hicks.
 
+The minimum biclique cover problem aims to find a minimum number of bicliques (i.e., complete bipartite graph) such that every edge of the input graph is covered by at least one biclique.  
+
 ## Installation
 
 To run the project, start by creating and activating a virtual environment. Refer to the [official python documentation](https://docs.python.org/3/library/venv.html) for detailed instructions specific to your operating system. Once the virtual environment is activated, install all dependencies with the following command:
