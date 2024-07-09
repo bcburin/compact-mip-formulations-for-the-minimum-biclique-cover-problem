@@ -7,7 +7,7 @@ The minimum biclique cover problem aims to find a minimum number of bicliques (i
 
 The following Figure shows an input graph (left) and a corresponding minimum biclique cover with size 4. 
 
-![Figure 1](readme_images/biclique_cover_fig_github.tif?raw=true "An input graph and its corresponding minimum biclique cover")
+![Figure 1](readme_images/biclique_cover_figure.png?raw=true "An input graph and its corresponding minimum biclique cover")
 
 ## Installation
 
