@@ -5,7 +5,7 @@ This is the GitHub repository for the paper "Compact MIP Formulations for the Mi
 
 The minimum biclique cover problem aims to find a minimum number of bicliques (i.e., complete bipartite graph) such that every edge of the input graph is covered by at least one biclique. 
 
-The following Figure shows an input graph (left) and a corresponding minimum biclique cover with size 4. 
+The following Figure shows an input graph (left) and a corresponding minimum biclique cover with size 4 (right). 
 
 ![Figure 1](readme_images/biclique_cover_figure.png?raw=true "An input graph and its corresponding minimum biclique cover")
 
