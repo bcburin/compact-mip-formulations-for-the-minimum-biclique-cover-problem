@@ -72,7 +72,8 @@ class MBCModel(ABC):
 
     def _log_message(self, msg: str):
         msg = f"[{self.__class__.__name__}] " + msg
-        self._log_res.write(msg)
+        if self._logging:
+            self._log_res.write(msg)
         print(msg)
 
     def __del__(self):

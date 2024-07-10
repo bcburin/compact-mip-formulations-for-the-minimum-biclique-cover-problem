@@ -12,7 +12,8 @@ def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
     # create logs directory
     dir_logs = get_and_create_logs_dir()
     dir_ts_logs = path.join(dir_logs, config.resolved_report_name)
-    mkdir(dir_ts_logs)
+    if config.create_log_files:
+        mkdir(dir_ts_logs)
 
     # constant strings
     str_model = 'Model'
@@ -31,7 +32,7 @@ def create_and_save_model_comparison_report(config: ReportConfig, **kwargs):
             g_name, _ = get_file_name_and_extension(fname=run_config.graph)
             run_model = getattr(model_classes, run_config.model)
             model = run_model(
-                g=g, g_name=run_config.resolved_gname, dir_logs=dir_ts_logs, config=run_config, default_config=config)
+                g=g, g_name=run_config.resolved_gname, dir_logs=dir_ts_logs if config.create_log_files else None, config=run_config, default_config=config)
             # calculate values
             try:
                 k, t_k = chronometer(model.upper_bound)

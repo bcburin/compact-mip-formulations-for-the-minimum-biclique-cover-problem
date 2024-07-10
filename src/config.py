@@ -44,6 +44,7 @@ class ReportConfig(BaseModel):
     default_use_callback: bool = False
     default_time_limit: int | None = 3600
     run_configs: list[RunConfig]
+    create_log_files: bool = False
 
     @cached_property
     def timestamp(self) -> int:
