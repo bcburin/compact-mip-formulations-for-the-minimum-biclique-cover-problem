@@ -22,7 +22,7 @@ pip install -r requirements.txt
 To obtain the bounds, use the following command:
 
 ```commandline
-python -m src.bc_bounds 1>>log-file.txt 2>>error-file.txt
+python -m src.bc_bounds 1>>log-bounds.txt 2>>error-bounds.txt
 ```
 
 ## Running the Project
