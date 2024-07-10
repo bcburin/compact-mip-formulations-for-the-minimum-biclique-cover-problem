@@ -17,6 +17,14 @@ To run the project, start by creating and activating a virtual environment. Refe
 pip install -r requirements.txt
 ```
 
+## Obtaining the Bounds
+
+To obtain the bounds, use the following command:
+
+```commandline
+python -m src.bc_bounds 1>>log-file.txt 2>>error-file.txt
+```
+
 ## Running the Project
 
 Run the project using the command:
