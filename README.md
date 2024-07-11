@@ -30,7 +30,7 @@ python -m src.bc_bounds 1>>log-bounds.txt 2>>error-bounds.txt
 Run the project using the command:
 
 ```commandline
-python -m src.main "configs/config_file.json"
+python -m src.main "configs/config_file.json" 1>>log-config.txt 2>>error-config.txt
 ```
 
 Here, `config_file.json` is a configuration file specifying the parameters for batch runs of different graphs and models. The `./config/` directory contains several pre-made configuration files. Detailed documentation on creating custom configuration files is provided below.
