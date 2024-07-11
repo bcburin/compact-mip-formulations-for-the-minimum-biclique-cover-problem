@@ -227,8 +227,7 @@ class MBCModel(ABC):
         # custom pre-solve with default implementation
         self._pre_solve()
         # optimization process
-        if self._logging:
-            self._log_message(f'Solving for graph {self.g_name}...')
+        self._log_message(f'Solving for graph {self.g_name}...')
         if self._callback is not None:
             # noinspection PyArgumentList
             self.m.optimize(self._callback)
