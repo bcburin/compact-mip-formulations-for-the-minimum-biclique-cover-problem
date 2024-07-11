@@ -128,7 +128,7 @@ class NaturalModel(MBCModel):
             if biclique >= len(edges):
                 return
             e = edges[biclique]
-            self.x[min(e), max(e), biclique].lb = 1
+            self.x[e[0], e[1], biclique].lb = 1
 
     @classmethod
     def name(cls) -> str:
