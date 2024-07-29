@@ -1,2 +1,0 @@
-C:\Users\hvalidi\Downloads\compact-mip-formulations-for-the-minimum-biclique-cover-problem-main\compact-mip-formulations-for-the-minimum-biclique-cover-problem-main\src\bc_bounds.py:91: DeprecationWarning: Calling quicksum on a tupledict is deprecated, use .sum() instead.
-  m.setObjective(gp.quicksum(x), sense=GRB.MAXIMIZE)
