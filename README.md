@@ -1,6 +1,6 @@
 # Compact MIP Formulations for the Minimum Biclique Cover Problem
 
-This is the GitHub repository for the paper "Compact MIP Formulations for the Minimum Biclique Cover Problem" by Bruno Burin, Hamidreza Validi, Bochuan Lyu, and Illya V. Hicks.
+This is the GitHub repository for the paper "[Compact MIP Formulations for the Minimum Biclique Cover Problem](https://optimization-online.org/wp-content/uploads/2024/07/Compact_MIP_Formulations_for_the_Minimum_Biclique_Cover_Problem_HV.pdf)" by Bruno Burin, Hamidreza Validi, Bochuan Lyu, and Illya V. Hicks.
 
 
 The minimum biclique cover problem aims to find a minimum number of bicliques (i.e., complete bipartite graph) such that every edge of the input graph is covered by at least one biclique. 
