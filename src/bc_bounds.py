@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 import cvxpy as cp
 
-from src.util import get_graphs_in_store, GraphReport
+from src.util import get_graphs_in_store, GraphReport, get_graph_in_store
 
 
 class LBComputeMethod(str, Enum):
@@ -228,24 +228,64 @@ def merge_stars(g: nx.Graph, t: gp.Model = None) -> list:
     return biclique_cover
 
 
+def get_partial_model_of_extension_lb(g: nx.Graph) -> gp.Model:
+    m = gp.Model()
+    directed = g.to_directed()
+    # add vars
+    x = m.addVars(directed.edges, vtype=GRB.BINARY, name="x")
+    y = m.addVars(g.nodes, range(2), vtype=GRB.BINARY, name="y")
+    # set objective function
+    m.setObjective(gp.quicksum(x), sense=GRB.MAXIMIZE)
+    # add constraints
+    m.addConstrs(y[u, 0] + y[v, 0] <= 1 for u, v in g.edges)
+    m.addConstrs(y[u, 1] + y[v, 1] <= 1 for u, v in g.edges)
+    m.addConstrs(y[v, 0] + y[v, 1] <= 1 for v in g.nodes)
+    m.addConstrs(x[u, v] <= y[u, 0] for u, v in directed.edges)
+    m.addConstrs(x[u, v] <= y[v, 1] for u, v in directed.edges)
+    m.addConstrs(y[u, 0] + y[v, 1] <= 1 + x[u, v] for u, v in directed.edges)
+    m._x = x
+    m._y = y
+    return m
+
+
+def get_extension_lb(g: nx.Graph):
+    _, edges = compute_lb_and_get_edges_by_independent_edges_method(g)
+    m = get_partial_model_of_extension_lb(g)
+    directed = g.to_directed()
+    bicliques = {(i, j): [] for i, j in edges}
+    for i, j in edges:
+        m._x[i, j].lb = 1
+        m._y[i, 0].lb = 1
+        m._y[j, 1].lb = 1
+        m.solve()
+        bicliques[i, j] = [(u, v) for u, v in directed.edges if m._x[u, v].X > 0.5]
+        m._x[i, j].lb = 0
+        m._y[i, 0].lb = 0
+        m._y[j, 1].lb = 0
+    return bicliques
+
+
 if __name__ == "__main__":
-    model_time_limit = None
-    model_memory_limit = 4
-    report = GraphReport('bounds')
-    report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
-    # report.add_properties([str(method) for method in UBComputeMethod])
-    # iterate graphs
-    for g, g_name in get_graphs_in_store(recursive=False):
-        report.add_graph_data(g, g_name)
-        for method in LBComputeMethod:
-            # LOVASZ is too slow for a small number of edges
-            if method == LBComputeMethod.LOVASZ:
-                continue
-            report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g,
-                                                     method=method, time_limit=model_time_limit,
-                                                     memory_limit=model_memory_limit)
-        # for method in UBComputeMethod:
-        #     report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
-        #                                              method=method, time_limit=model_time_limit,
-        #                                              memory_limit=model_memory_limit)
-    report.save_csv()
+    g = get_graph_in_store(filename="simple_5_7.gml")
+    g_bicliques = get_extension_lb(g)
+    print(g_bicliques)
+    # model_time_limit = None
+    # model_memory_limit = 4
+    # report = GraphReport('bounds')
+    # report.add_properties([str(method) for method in LBComputeMethod if method != LBComputeMethod.LOVASZ])
+    # # report.add_properties([str(method) for method in UBComputeMethod])
+    # # iterate graphs
+    # for g, g_name in get_graphs_in_store(recursive=False):
+    #     report.add_graph_data(g, g_name)
+    #     for method in LBComputeMethod:
+    #         # LOVASZ is too slow for a small number of edges
+    #         if method == LBComputeMethod.LOVASZ:
+    #             continue
+    #         report.add_property_values_from_function(p_name=str(method), f=find_bc_lower_bound, g=g,
+    #                                                  method=method, time_limit=model_time_limit,
+    #                                                  memory_limit=model_memory_limit)
+    #     # for method in UBComputeMethod:
+    #     #     report.add_property_values_from_function(p_name=str(method), f=find_bc_upper_bound, g=g,
+    #     #                                              method=method, time_limit=model_time_limit,
+    #     #                                              memory_limit=model_memory_limit)
+    # report.save_csv()
