@@ -7,7 +7,7 @@
     {
       "graph": "surfers.txt",
       "model": "NaturalModel",
-      "name": "$surfers-natural-model"
+      "name": "surfers-natural-model"
     },
     {
       "graph": "surfers.txt",
@@ -25,24 +25,24 @@
       "name": "lesmis-extended-model"
     },
     {
-      "graph": "footbal114.gml",
+      "graph": "football114.gml",
       "model": "NaturalModel",
       "name": "football-natural-model"
     },
     {
-      "graph": "footbal114.gml",
+      "graph": "football114.gml",
       "model": "ExtendedModel",
       "name": "football-extended-model"
     },
     {
       "graph": "jazz-musicians.txt",
       "model": "NaturalModel",
-      "name": "football-natural-model"
+      "name": "jazz-natural-model"
     },
     {
       "graph": "jazz-musicians.txt",
       "model": "ExtendedModel",
-      "name": "football-extended-model"
+      "name": "jazz-extended-model"
     }
   ]
 }
