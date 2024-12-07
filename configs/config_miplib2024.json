@@ -7,14 +7,42 @@
     {
       "graph": "surfers.txt",
       "model": "NaturalModel",
-      "name": "$graph-natural-model-with-edge-fixing",
-      "edge_fix": true
+      "name": "$surfers-natural-model"
     },
     {
       "graph": "surfers.txt",
       "model": "ExtendedModel",
-      "name": "$graph-extended-model-with-edge-fixing",
-      "edge_fix": false
+      "name": "surfers-extended-model"
+    },
+    {
+      "graph": "lesmis76.gml",
+      "model": "NaturalModel",
+      "name": "lesmis-natural-model"
+    },
+    {
+      "graph": "lesmis76.gml",
+      "model": "ExtendedModel",
+      "name": "lesmis-extended-model"
+    },
+    {
+      "graph": "footbal114.gml",
+      "model": "NaturalModel",
+      "name": "football-natural-model"
+    },
+    {
+      "graph": "footbal114.gml",
+      "model": "ExtendedModel",
+      "name": "football-extended-model"
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "NaturalModel",
+      "name": "football-natural-model"
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "ExtendedModel",
+      "name": "football-extended-model"
     }
   ]
 }
