@@ -1,0 +1,20 @@
+{
+  "report_name":  "surfers-models-$ts",
+  "default_lb_method": "independent_edges",
+  "default_ub_method": "vertex",
+  "default_time_limit": 300,
+  "run_configs": [
+    {
+      "graph": "surfers.txt",
+      "model": "NaturalModel",
+      "name": "$graph-natural-model-with-edge-fixing",
+      "edge_fix": true
+    },
+    {
+      "graph": "surfers.txt",
+      "model": "ExtendedModel",
+      "name": "$graph-extended-model-with-edge-fixing",
+      "edge_fix": false
+    }
+  ]
+}

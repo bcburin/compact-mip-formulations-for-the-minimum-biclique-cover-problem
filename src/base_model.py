@@ -228,13 +228,13 @@ class MBCModel(ABC):
         self._pre_solve()
         # optimization process
         self._log_message(f'Solving for graph {self.g_name}...')
-        if self._callback is not None:
-            # noinspection PyArgumentList
-            self.m.optimize(self._callback)
-        else:
-            self.m.optimize()
+        # if self._callback is not None:
+        #     # noinspection PyArgumentList
+        #     self.m.optimize(self._callback)
+        # else:
+        #     self.m.optimize()
         self._solved = True
-        self.m.write("out.lp")
+        self.m.write(f"{self._config.name}.mps")
         # custom post-solve with default implementation
         self._post_solve()
         # return obj val
