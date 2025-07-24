@@ -25,8 +25,9 @@ def create_and_save_model_comparison_report(config: ReportConfig):
             model = run_model(g=g, config=run_config)
             # calculate values
             k, t_k = chronometer(lambda: model.upper_bound)
-            ub, time = chronometer(f=model.solve)
-            lb = model.m.ObjBoundC if not model.is_feasible else None
+            feasible, time = chronometer(f=model.solve)
+            ub = model.solution
+            lb = model.m.ObjBoundC if not feasible else None
             # add values to report
             report.add_graph_data(g, run_config.resolved_gname)
             report.add_property_values(p_name=str_model, p_value=run_config.model)

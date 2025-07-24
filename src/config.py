@@ -18,6 +18,7 @@ class RunConfig(BaseModel):
     bottom_up: bool | None = None
     warm_start: bool | None = None
     use_callback: bool | None = None
+    use_strengthening_constraints: bool | None = None
     conflict_inequalities: bool | None = None
     common_neighbor_inequalities: bool | None = None
     time_limit: int | None = None
@@ -40,6 +41,7 @@ class ReportConfig(BaseModel):
     default_warm_start: bool = False
     default_bottom_up: bool = False
     default_use_callback: bool = False
+    default_use_strengthening_constraints: bool = False
     default_conflict_inequalities: bool = False
     default_common_neighbor_inequalities: bool = False
     default_time_limit: int | None = 3600
@@ -84,6 +86,11 @@ def read_report_config_file(config_file_path: str) -> ReportConfig:
             run.use_callback
             if run.use_callback is not None
             else config.default_use_callback
+        )
+        run.use_strengthening_constraints = (
+            run.use_strengthening_constraints
+            if run.use_strengthening_constraints is not None
+            else config.default_use_strengthening_constraints
         )
         run.conflict_inequalities = (
             run.conflict_inequalities

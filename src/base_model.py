@@ -46,11 +46,12 @@ class BaseSolver(ABC):
         self._do_solve()
         self._post_solve()
         self._solved = True
-        return self.is_feasible()
+        self._feasible = self.is_feasible()
+        return self._feasible
 
     @cached_property
     def solution(self) -> float:
-        if self._solved:
+        if not self._solved:
             raise NotYetSolvedError()
         if self._feasible is None or not self._feasible:
             raise UnfeasibleSolutionError()
@@ -90,7 +91,7 @@ class BaseGpSolver(BaseSolver):
         return self.m.objVal
 
     def is_feasible(self) -> bool:
-        return self.m.status in self._INFEASIBLE_STATUSES
+        return self.m.status not in self._INFEASIBLE_STATUSES
 
 
 class BaseMinimumBicliqueCoverSolver(BaseSolver):

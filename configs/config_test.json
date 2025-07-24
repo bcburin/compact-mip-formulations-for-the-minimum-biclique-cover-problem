@@ -6,40 +6,20 @@
   "default_edge_fix": true,
   "run_configs": [
     {
-      "graph": "karate34.gml",
-      "model": "ExtendedModel",
-      "name": "$graph - without callback",
-      "use_callback": false
+      "graph": "simple_5_7.gml",
+      "model": "NaturalModel",
+      "name": "$graph-NaturalModel"
     },
     {
-      "graph": "karate34.gml",
-      "model": "ExtendedModel",
-      "name": "$graph - with callback",
-      "use_callback": true
+      "graph": "simple_5_7.gml",
+      "model": "NaturalModel",
+      "name": "$graph-NaturalModel-with-strengthening-constraints",
+      "use_strengthening_constraints": true
     },
     {
-      "graph": "ieee30.txt",
+      "graph": "simple_5_7.gml",
       "model": "ExtendedModel",
-      "name": "$graph - without callback",
-      "use_callback": false
-    },
-    {
-      "graph": "ieee30.txt",
-      "model": "ExtendedModel",
-      "name": "$graph - with callback",
-      "use_callback": true
-    },
-    {
-      "graph": "ieee57.txt",
-      "model": "ExtendedModel",
-      "name": "$graph - without callback",
-      "use_callback": false
-    },
-    {
-      "graph": "ieee57.txt",
-      "model": "ExtendedModel",
-      "name": "$graph - with callback",
-      "use_callback": true
+      "name": "$graph-ExtendedModel"
     }
   ]
 }

@@ -89,6 +89,9 @@ class NaturalModel(BaseMinimumBicliqueCoverGpSolver):
         # independent edges constraints
         if self._can_add_indep_edges_constraints():
             self._add_independent_edges_constraints()
+        # strengthening constraints
+        if self._config.use_strengthening_constraints:
+            self._add_strengthening_constraints()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
@@ -134,6 +137,19 @@ class NaturalModel(BaseMinimumBicliqueCoverGpSolver):
                 return
             e = edges[biclique]
             self.x[e[0], e[1], biclique].lb = 1
+
+    def _add_strengthening_constraints(self):
+        m, x, z = self.m, self.x, self.z
+        for e, f, cr1, cr2 in self.get_disjoint_edges():
+            a, b = e
+            c, d = f
+            if cr1 == 2 and cr2 == 2:  # TODO: is cr2 == 2 necessary?
+                m.addConstrs(
+                    var_swap(x, b, c, i) + var_swap(x, a, b, i) + var_swap(x, c, d, i) <=
+                    2 * z[i] + var_swap(x, a, d, i) for i in self.bicliques)
+                m.addConstrs(
+                    var_swap(x, a, d, i) + var_swap(x, a, b, i) + var_swap(x, c, d, i) <=
+                    2 * z[i] + var_swap(x, b, c, i) for i in self.bicliques)
 
     @classmethod
     def name(cls) -> str:
@@ -186,6 +202,9 @@ class ExtendedModel(BaseMinimumBicliqueCoverGpSolver):
         # common neighbors inequalities
         if self._config.common_neighbor_inequalities:
             self._add_common_neighbor_inequalities()
+        # strengthening constraints
+        if self._config.use_strengthening_constraints:
+            self._add_strengthening_constraints()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
@@ -242,6 +261,9 @@ class ExtendedModel(BaseMinimumBicliqueCoverGpSolver):
             self.m.addConstrs(
                 self.y[u, i, 1] + self.y[v, i, 1] <= self.z[i] + gp.quicksum(self.y[c, i, 0] for c in common_neighbors)
                 for i in self.bicliques)
+
+    def _add_strengthening_constraints(self):
+        ...
 
     def _do_warm_start(self, indep_edges: list, vertex_cover: list):
         assign = dict()
