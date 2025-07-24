@@ -3,8 +3,7 @@ from abc import ABC, abstractmethod
 from functools import cache, cached_property
 from itertools import combinations
 
-from os import path
-from typing import TextIO, Iterable
+from typing import Iterable
 
 import gurobipy as gp
 import networkx as nx
@@ -12,152 +11,175 @@ from gurobipy import GRB
 
 from src.bc_bounds import find_bc_upper_bound, find_bc_lower_bound, UBComputeMethod, get_vertex_cover_solution, \
     LBComputeMethod, compute_lb_and_get_edges_by_independent_edges_method
-from src.config import RunConfig, ReportConfig
+from src.config import RunConfig
+from src.exceptions import AlreadySolvedError, NotYetSolvedError, UnfeasibleSolutionError
 
 
-class MBCModel(ABC):
+class BaseSolver(ABC):
 
-    def __init__(
-             self,
-             g: nx.Graph,
-             g_name: str,
-             config: RunConfig,
-             default_config: ReportConfig,
-             log_to_console: bool = True,
-             dir_logs: str = None):
-        self.g = g
-        self.g_name = g_name
-        self._config = config
-        self._default_config = default_config
-        self._log_to_console = log_to_console
-        self._dir_logs = dir_logs
-        self._logging = bool(dir_logs)
-        # config properties
-        self._time_limit = (
-            self._config.time_limit) \
-            if self._config.time_limit is not None \
-            else self._default_config.default_time_limit
-        self._lb_method = self._config.lb_method or self._default_config.default_lb_method
-        self._ub_method = self._config.ub_method or self._default_config.default_ub_method
-        self._edge_fix = (
-            self._config.edge_fix) \
-            if self._config.edge_fix is not None \
-            else self._default_config.default_edge_fix
-        self._warm_start = (
-            self._config.warm_start) \
-            if self._config.warm_start is not None \
-            else self._default_config.default_warm_start
-        self._conflict_inequalities = (
-            self._config.conflict_inequalities
-            if self._config.conflict_inequalities is not None
-            else self._default_config.default_conflict_inequalities)
-        self._common_neighbor_inequalities = (
-            self._config.common_neighbor_inequalities
-            if self._config.common_neighbor_inequalities is not None
-            else self._default_config.default_common_neighbor_inequalities)
-        self._use_callback = (
-            self._config.use_callback) \
-            if self._config.use_callback is not None else (
-            self._default_config.default_use_callback)
-        self._callback = None
-        # model
-        self._init_model()
-        # create log files
-        if self._logging:
-            self._open_files(dir_logs=dir_logs)
-        # parameters
-        self._set_parameters()
-        # initial state
-        self._solved = False
+    def __init__(self):
+        self._solved: bool = False
+        self._feasible: bool | None = None
 
-    def _log_message(self, msg: str):
-        msg = f"[{self.__class__.__name__}] " + msg
-        if self._logging:
-            self._log_res.write(msg)
-        print(msg)
+    def _pre_solve(self) -> None:
+        ...
 
-    def __del__(self):
-        if hasattr(self, '_files_open') and self._files_open:
-            self._close_files()
+    def _post_solve(self) -> None:
+        ...
 
-    def _open_files(self, dir_logs: str):
-        model_graph_name = self.name() + '_' + self.g_name
-        self._log_grb = open(path.join(dir_logs, model_graph_name + '_gurobi.log'), 'w+')
-        self._log_res = open(path.join(dir_logs, model_graph_name + '_result.log'), 'w+')
-        self._write_headers(self._log_res)
-        self._files_open = True
+    @abstractmethod
+    def _do_solve(self) -> None:
+        ...
 
-    def _close_files(self):
-        self._log_grb.close()
-        self._log_res.close()
+    @abstractmethod
+    def _do_get_solution(self) -> float:
+        ...
 
-    def _set_parameters(self):
-        if self._time_limit is not None:
-            self.m.Params.TimeLimit = self._time_limit
-        if not self._log_to_console:
-            self.m.Params.LogToConsole = 0
-        if self._logging:
-            self.m.Params.LogFile = self._log_grb.name
+    @abstractmethod
+    def is_feasible(self) -> bool:
+        ...
 
-    def _init_model(self):
+    def solve(self) -> bool:
+        if self._solved:
+            raise AlreadySolvedError()
+        self._pre_solve()
+        self._do_solve()
+        self._post_solve()
+        self._solved = True
+        return self.is_feasible()
+
+    @cached_property
+    def solution(self) -> float:
+        if self._solved:
+            raise NotYetSolvedError()
+        if self._feasible is None or not self._feasible:
+            raise UnfeasibleSolutionError()
+        return self._do_get_solution()
+
+
+class BaseGpSolver(BaseSolver):
+    _INFEASIBLE_STATUSES = [GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.INTERRUPTED, GRB.LOADED]
+
+    def __init__(self):
+        super().__init__()
         self.m = gp.Model()
         self._add_variables()
         self._set_objective()
         self._add_constraints()
 
-    def _write_headers(self, log: TextIO):
-        log.write(f'GRAPH: {self.g_name}\n')
-        log.write(f'NODES: {len(self.g.nodes)}\n')
-        log.write(f'EDGES: {len(self.g.edges)}\n\n')
-
     @abstractmethod
-    def _add_variables(self):
-        self.z = self.m.addVars(self.bicliques, vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="z")
-
-    @abstractmethod
-    def _add_constraints(self):
+    def _add_variables(self) -> None:
         ...
 
     @abstractmethod
-    def _set_objective(self):
+    def _add_constraints(self) -> None:
         ...
 
     @abstractmethod
-    def _check_biclique_cover(self) -> bool:
+    def _set_objective(self) -> None:
         ...
 
-    @classmethod
     @abstractmethod
-    def name(cls) -> str:
+    def _set_parameters(self) -> None:
         ...
 
-    def _pre_solve(self):
-        ...
+    def _do_solve(self) -> None:
+        self.m.optimize()
 
-    def _post_solve(self):
-        # check and log solution
-        if not self._logging:
+    def _do_get_solution(self) -> float:
+        return self.m.objVal
+
+    def is_feasible(self) -> bool:
+        return self.m.status in self._INFEASIBLE_STATUSES
+
+
+class BaseMinimumBicliqueCoverSolver(BaseSolver):
+
+    def __init__(self, g: nx.Graph, config: RunConfig):
+        self._g = g
+        self._config = config
+        # model cache
+        self._lb: int | None = None
+        self._ub: int | None = None
+        self._indep_edges: list[tuple[int, int]] | None = None
+        self._vertex_cover: list | None = None
+        super().__init__()
+
+    def _guarantee_compute_lb_and_indep_edges(self) -> None:
+        if self._lb and self._indep_edges:
             return
-        if self.m.status == GRB.OPTIMAL:
-            # check solution
-            self._log_message(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
-        elif self.m.status == GRB.TIME_LIMIT:
-            self._log_message(f'Model reached time limit of {self._time_limit} seconds.\n')
-        elif self.m.status == GRB.INFEASIBLE:
-            self._log_message('Model is unfeasible.\n')
-        else:
-            self._log_message(f'Status code: {self.m.status}\n')
-        if self._logging:
-            self._close_files()
+        lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.graph)
+        self._lb = int(lb)
+        self._indep_edges = edges
+
+    def _guarantee_compute_ub_and_vertex_cover(self) -> None:
+        if self._ub and self._vertex_cover:
+            return
+        t, ub = get_vertex_cover_solution(g=self.graph)
+        self._ub = int(ub)
+        self._vertex_cover = t
+        return
 
     @property
+    def lower_bound(self) -> int:
+        if self._lb:
+            return self._lb
+        print(f'Finding lower bound for {self._config.resolved_gname}')
+        method = self._config.lb_method
+        if method == LBComputeMethod.INDEPENDENT_EDGES:
+            self._guarantee_compute_lb_and_indep_edges()
+            return self._lb
+        else:
+            return int(find_bc_lower_bound(self.graph, method)) if method else 1
+
+    @property
+    def upper_bound(self) -> int:
+        if self._ub:
+            return self._ub
+        print(f'Finding upper bound for {self._config.resolved_gname}')
+        method = self._config.ub_method
+        if method == UBComputeMethod.VERTEX:
+            self._guarantee_compute_ub_and_vertex_cover()
+            return self._ub
+        else:
+            return int(find_bc_upper_bound(self.graph, method)) if method else self.graph.edges
+
     @cache
+    def get_disjoint_edges(self) -> set[tuple[int, int, int, int]]:
+        disjoint_edges = set()
+        for e, f in combinations(self.graph.edges, r=2):
+            a, b = e
+            c, d = f
+            if {a, b}.isdisjoint({c, d}):
+                cr1, cr2 = 0, 0
+                if self.graph.has_edge(a, d):
+                    cr1 += 1
+                if self.graph.has_edge(c, b):
+                    cr1 += 1
+                if self.graph.has_edge(a, c):
+                    cr2 += 1
+                if self.graph.has_edge(b, d):
+                    cr2 += 1
+                disjoint_edges.add((e, f, cr1, cr2))
+        return disjoint_edges
+
+    def _can_add_indep_edges_constraints(self) -> bool:
+        if self._config.warm_start or not self._config.edge_fix:
+            return False
+        self._guarantee_compute_lb_and_indep_edges()
+        return bool(self._indep_edges)
+
+    @property
+    def graph(self) -> nx.Graph:
+        return self._g
+
+    @cached_property
     def directed(self) -> nx.DiGraph:
-        return nx.DiGraph(self.g)
+        return nx.DiGraph(self.graph)
 
     @cached_property
     def complement(self) -> nx.Graph:
-        return nx.complement(self.g)
+        return nx.complement(self.graph)
 
     @cached_property
     def directed_complement(self) -> nx.Graph:
@@ -165,78 +187,43 @@ class MBCModel(ABC):
 
     @cached_property
     def power_graph(self) -> nx.Graph:
-        return nx.power(self.g, k=2)
+        return nx.power(self.graph, k=2)
 
-    @cache
-    def get_lb_and_indep_edges(self) -> tuple[int, list[tuple[int, int]]]:
-        lb, edges = compute_lb_and_get_edges_by_independent_edges_method(g=self.g)
-        return int(lb), edges
-
-    @cache
-    def get_ub_and_vertex_cover(self) -> tuple[int, list[int]]:
-        t, ub = get_vertex_cover_solution(g=self.g)
-        return int(ub), t
-
-    @cache
-    def lower_bound(self) -> int:
-        if self._lb_method == LBComputeMethod.INDEPENDENT_EDGES:
-            lb, _ = self.get_lb_and_indep_edges()
-            return lb
-        else:
-            return int(find_bc_lower_bound(self.g, self._lb_method)) if self._lb_method else 1
-
-    @cache
-    def upper_bound(self) -> int:
-        if self._ub_method == UBComputeMethod.VERTEX:
-            ub, _ = self.get_ub_and_vertex_cover()
-            return ub
-        else:
-            return int(find_bc_upper_bound(self.g, self._ub_method)) if self._ub_method else self.g.edges
-
-    @property
+    @cached_property
     def bicliques(self) -> Iterable:
-        return range(self.upper_bound())
+        return range(self.upper_bound)
 
-    @cache
-    def get_disjoint_edges(self) -> set[tuple[int, int, int, int]]:
-        disjoint_edges = set()
-        for e, f in combinations(self.g.edges, r=2):
-            a, b = e
-            c, d = f
-            if {a, b}.isdisjoint({c, d}):
-                cr1, cr2 = 0, 0
-                if self.g.has_edge(a, d):
-                    cr1 += 1
-                if self.g.has_edge(c, b):
-                    cr1 += 1
-                if self.g.has_edge(a, c):
-                    cr2 += 1
-                if self.g.has_edge(b, d):
-                    cr2 += 1
-                disjoint_edges.add((e, f, cr1, cr2))
-        return disjoint_edges
+    @abstractmethod
+    def _check_biclique_cover(self) -> bool:
+        ...
 
-    def _can_add_indep_edges_constraints(self) -> bool:
-        _, indep_edges = self.get_lb_and_indep_edges()
-        return bool(indep_edges) and self._edge_fix and not self._warm_start
 
-    def infeasible_or_unsolved(self) -> bool:
-        return self.m.status in [GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.INTERRUPTED, GRB.LOADED]
+def _log_message(msg, *args, **kwargs):
+    print(msg, args, kwargs)
 
-    def solve(self) -> float | None:
-        # custom pre-solve with default implementation
-        self._pre_solve()
-        # optimization process
-        self._log_message(f'Solving for graph {self.g_name}...')
-        # if self._callback is not None:
-        #     # noinspection PyArgumentList
-        #     self.m.optimize(self._callback)
-        # else:
-        #     self.m.optimize()
-        self._solved = True
-        self.m.write(f"{self._config.name}.mps")
-        # custom post-solve with default implementation
-        self._post_solve()
-        # return obj val
-        if not self.infeasible_or_unsolved():
-            return self.m.objVal
+
+class BaseMinimumBicliqueCoverGpSolver(BaseMinimumBicliqueCoverSolver, BaseGpSolver, ABC):
+
+    def __init__(self, g: nx.Graph, config: RunConfig):
+        BaseMinimumBicliqueCoverSolver.__init__(self, g, config)
+        BaseGpSolver.__init__(self)
+
+    def _set_parameters(self):
+        if self._config.time_limit is not None:
+            self.m.Params.TimeLimit = self._config.time_limit
+
+    def _post_solve(self):
+        # check and log the solution
+        if self.m.status == GRB.OPTIMAL:
+            # check the solution
+            _log_message(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
+        elif self.m.status == GRB.TIME_LIMIT:
+            _log_message(f'Model reached time limit of {self._config.time_limit} seconds.\n')
+        elif self.m.status == GRB.INFEASIBLE:
+            _log_message('Model is unfeasible.\n')
+        else:
+            _log_message(f'Status code: {self.m.status}\n')
+
+    @classmethod
+    def name(cls):
+        return "Base Class"

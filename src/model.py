@@ -4,7 +4,8 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.base_model import MBCModel
+from src.base_model import BaseMinimumBicliqueCoverGpSolver
+from src.config import RunConfig
 from src.independent_set import solve_max_weighted_independent_set
 from src.util import is_biclique, var_swap
 
@@ -31,12 +32,15 @@ def indep_callback(model: gp.Model, where: int):
             model.cbCut(gp.quicksum(model._y[v, j, 0] + model._y[v, j, 1] for v in indep_set) <= model._z[j])
 
 
-class NaturalModel(MBCModel):
+class NaturalModel(BaseMinimumBicliqueCoverGpSolver):
+
+    def __init__(self, g: nx.Graph, config: RunConfig):
+        super().__init__(g, config)
 
     def _add_variables(self):
         # 4j
         self.z = self.m.addVars(self.bicliques, vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="z")
-        self.x = self.m.addVars(self.g.edges, self.bicliques, vtype=GRB.BINARY, name="x")
+        self.x = self.m.addVars(self.graph.edges, self.bicliques, vtype=GRB.BINARY, name="x")
 
     def _set_objective(self):
         # 4a
@@ -46,11 +50,11 @@ class NaturalModel(MBCModel):
         m, x, z = self.m, self.x, self.z
 
         # 4b
-        m.addConstrs(x[u, v, i] <= z[i] for u, v in self.g.edges for i in self.bicliques)
+        m.addConstrs(x[u, v, i] <= z[i] for u, v in self.graph.edges for i in self.bicliques)
         # 4c
-        m.addConstrs(gp.quicksum(x[u, v, i] for i in self.bicliques) >= 1 for u, v in self.g.edges)
+        m.addConstrs(gp.quicksum(x[u, v, i] for i in self.bicliques) >= 1 for u, v in self.graph.edges)
         # 4e
-        for cycle in nx.simple_cycles(self.g, length_bound=3):  # TODO: fix me
+        for cycle in nx.simple_cycles(self.graph, length_bound=3):  # TODO: fix me
             if len(cycle) != 3:
                 continue
             cycle_edges = [[cycle[0], cycle[1]], [cycle[1], cycle[2]], [cycle[2], cycle[0]]]
@@ -81,21 +85,21 @@ class NaturalModel(MBCModel):
                     x[a, b, i] + x[c, d, i] <=
                     z[i] + var_swap(x, b, c, i) + var_swap(x, b, d, i) for i in self.bicliques)
         # 4i
-        m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+        m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound - 1))
         # independent edges constraints
         if self._can_add_indep_edges_constraints():
             self._add_independent_edges_constraints()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
-        if not any(self.x[u, v, i].X == 1 for u, v in self.g.edges for i in self.bicliques):
+        if not any(self.x[u, v, i].X == 1 for u, v in self.graph.edges for i in self.bicliques):
             return False
         # check it's a biclique cover
         for i in self.bicliques:
             if self.z[i].X != 1:
                 continue
-            edges = [(u, v) for u, v in self.g.edges if self.x[u, v, i].X == 1]
-            if not is_biclique(graph=self.g, edges=edges):
+            edges = [(u, v) for u, v in self.graph.edges if self.x[u, v, i].X == 1]
+            if not is_biclique(graph=self.graph, edges=edges):
                 return False
         return True
 
@@ -103,27 +107,28 @@ class NaturalModel(MBCModel):
         assign = dict()
         for i, s in enumerate(vertex_cover):
             edges = []
-            for e in self.g.edges(s):
+            for e in self.graph.edges(s):
                 self.x[min(e), max(e), i].start = 1
                 edges.append(e)
             assign[i] = edges
         indep_edges = set(indep_edges)
-        if self._edge_fix:
+        if self._config.edge_fix:
             for i in assign.keys():
                 for e in assign[i]:
                     if e in indep_edges:
                         self.x[min(e), max(e), i].lb = 1
 
     def _pre_solve(self):
-        for b in range(self.lower_bound()):
+        for b in range(self.lower_bound):
             self.z[b].lb = 1
-        if self._warm_start:
-            _, indep_edges = self.get_lb_and_indep_edges()
-            _, vertex_cover = self.get_ub_and_vertex_cover()
-            self._do_warm_start(indep_edges=indep_edges, vertex_cover=vertex_cover)
+        if self._config.warm_start:
+            self._guarantee_compute_lb_and_indep_edges()
+            self._guarantee_compute_ub_and_vertex_cover()
+            self._do_warm_start(indep_edges=self._indep_edges, vertex_cover=self._vertex_cover)
 
     def _add_independent_edges_constraints(self):
-        _, edges = self.get_lb_and_indep_edges()
+        self._guarantee_compute_lb_and_indep_edges()
+        edges = self._indep_edges
         for biclique in self.bicliques:
             if biclique >= len(edges):
                 return
@@ -135,13 +140,16 @@ class NaturalModel(MBCModel):
         return 'Compact Natural Model'
 
 
-class ExtendedModel(MBCModel):
+class ExtendedModel(BaseMinimumBicliqueCoverGpSolver):
+    
+    def __init__(self, g: nx.Graph, config: RunConfig):
+        super().__init__(g, config)
 
     def _add_variables(self):
         # 5h
         self.z = self.m.addVars(self.bicliques, vtype=GRB.BINARY, name="z")
         self.x = self.m.addVars(self.directed.edges, self.bicliques, vtype=GRB.BINARY, name="x")
-        self.y = self.m.addVars(self.g.nodes, self.bicliques, range(2), vtype=GRB.BINARY, name="y")
+        self.y = self.m.addVars(self.graph.nodes, self.bicliques, range(2), vtype=GRB.BINARY, name="y")
 
     def _set_objective(self):
         # 5a
@@ -157,54 +165,55 @@ class ExtendedModel(MBCModel):
         m.addConstrs(y[u, i, 0] + y[v, i, 1] <= z[i] + x[u, v, i]
                      for u, v in self.directed.edges for i in self.bicliques)
         # 5d
-        m.addConstrs(y[u, i, 0] + y[u, i, 1] <= z[i] for u in self.g.nodes for i in self.bicliques)
+        m.addConstrs(y[u, i, 0] + y[u, i, 1] <= z[i] for u in self.graph.nodes for i in self.bicliques)
         # 5e
-        for u, v in self.g.edges:
+        for u, v in self.graph.edges:
             m.addConstr(gp.quicksum(x[u, v, i] + x[v, u, i] for i in self.bicliques) >= 1)
         # 5f
-        for u, v in combinations(self.g.nodes, r=2):
-            if self.g.has_edge(u, v):
+        for u, v in combinations(self.graph.nodes, r=2):
+            if self.graph.has_edge(u, v):
                 continue
             m.addConstrs(y[u, i, 0] + y[v, i, 1] <= z[i] for i in self.bicliques)
             m.addConstrs(y[v, i, 0] + y[u, i, 1] <= z[i] for i in self.bicliques)
         # 5g
-        m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound() - 1))
+        m.addConstrs(z[i] >= z[i + 1] for i in range(self.upper_bound - 1))
         # independent edges constraints
         if self._can_add_indep_edges_constraints():
             self._add_independent_edges_constraints()
         # conflict inequalities
-        if self._conflict_inequalities:
+        if self._config.conflict_inequalities:
             self._add_conflict_inequalities()
         # common neighbors inequalities
-        if self._common_neighbor_inequalities:
+        if self._config.common_neighbor_inequalities:
             self._add_common_neighbor_inequalities()
 
     def _check_biclique_cover(self) -> bool:
         # check it's a cover
         if not any(self.x[u, v, i].X == 1 or self.x[v, u, i].X == 1
-                   for u, v in self.g.edges for i in self.bicliques):
+                   for u, v in self.graph.edges for i in self.bicliques):
             return False
         # check it's a biclique cover
         for i in self.bicliques:
             if self.z[i].X != 1:
                 continue
-            edges = [(u, v) for u, v in self.g.edges if self.x[u, v, i].X == 1 or self.x[v, u, i].X == 1]
-            if not is_biclique(graph=self.g, edges=edges):
+            edges = [(u, v) for u, v in self.graph.edges if self.x[u, v, i].X == 1 or self.x[v, u, i].X == 1]
+            if not is_biclique(graph=self.graph, edges=edges):
                 return False
         return True
 
     def _pre_solve(self):
-        for b in range(self.lower_bound()):
+        for b in range(self.lower_bound):
             self.z[b].lb = 1
-        if self._use_callback:
+        if self._config.use_callback:
             self._add_callback()
-        if self._warm_start:
-            _, indep_edges = self.get_lb_and_indep_edges()
-            _, vertex_cover = self.get_ub_and_vertex_cover()
-            self._do_warm_start(indep_edges=indep_edges, vertex_cover=vertex_cover)
+        if self._config.warm_start:
+            self._guarantee_compute_lb_and_indep_edges()
+            self._guarantee_compute_ub_and_vertex_cover()
+            self._do_warm_start(indep_edges=self._indep_edges, vertex_cover=self._vertex_cover)
 
     def _add_independent_edges_constraints(self):
-        _, edges = self.get_lb_and_indep_edges()
+        self._guarantee_compute_lb_and_indep_edges()
+        edges = self._indep_edges
         for biclique in self.bicliques:
             if biclique >= len(edges):
                 return
@@ -213,7 +222,7 @@ class ExtendedModel(MBCModel):
             self.x[b, a, biclique].lb = 0
 
     def _add_conflict_inequalities(self):
-        for u, v in combinations(self.g.nodes, r=2):
+        for u, v in combinations(self.graph.nodes, r=2):
             if self.power_graph.has_edge(u, v):
                 continue
             conflict_inequalities = self.m.addConstrs(
@@ -224,9 +233,9 @@ class ExtendedModel(MBCModel):
 
     def _add_common_neighbor_inequalities(self):
         for u, v in self.power_graph.edges:
-            if self.g.has_edge(u, v):
+            if self.graph.has_edge(u, v):
                 continue
-            common_neighbors = nx.common_neighbors(self.g, u, v)
+            common_neighbors = nx.common_neighbors(self.graph, u, v)
             self.m.addConstrs(
                 self.y[u, i, 0] + self.y[v, i, 0] <= self.z[i] + gp.quicksum(self.y[c, i, 1] for c in common_neighbors)
                 for i in self.bicliques)
@@ -238,7 +247,7 @@ class ExtendedModel(MBCModel):
         assign = dict()
         for i, s in enumerate(vertex_cover):
             edges = []
-            for e in self.g.edges(s):
+            for e in self.graph.edges(s):
                 a, b = e
                 self.x[a, b, i].start = 1
                 self.x[b, a, i].start = 0
@@ -249,7 +258,7 @@ class ExtendedModel(MBCModel):
                 edges.append(e)
             assign[i] = edges
         indep_edges = set(indep_edges)
-        if self._edge_fix:
+        if self._config.edge_fix:
             for i in assign.keys():
                 for e in assign[i]:
                     if e in indep_edges:
@@ -262,10 +271,10 @@ class ExtendedModel(MBCModel):
                         self.y[b, i, 0].ub = 0
 
     def _add_callback(self):
-        self.m._k = self.upper_bound()
+        self.m._k = self.upper_bound
         self.m._y = self.y
         self.m._z = self.z
-        self.m._g = self.g
+        self.m._g = self.graph
         self.m._g2 = self.power_graph
         self._callback = indep_callback
 
