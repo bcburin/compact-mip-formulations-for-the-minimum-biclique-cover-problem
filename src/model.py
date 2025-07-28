@@ -4,10 +4,11 @@ import gurobipy as gp
 import networkx as nx
 from gurobipy import GRB
 
-from src.base_model import BaseMinimumBicliqueCoverGpSolver
+from src.base_model import BaseMinimumBicliqueCoverGpSolver, BaseMinimumBicliqueCoverSolver
 from src.config import RunConfig
+from src.exceptions import NotYetSolvedError
 from src.independent_set import solve_max_weighted_independent_set
-from src.util import is_biclique, var_swap
+from src.util import is_biclique, var_swap, chronometer
 
 
 def indep_callback(model: gp.Model, where: int):
@@ -143,7 +144,7 @@ class NaturalModel(BaseMinimumBicliqueCoverGpSolver):
         for e, f, cr1, cr2 in self.get_disjoint_edges():
             a, b = e
             c, d = f
-            if cr1 == 2 and cr2 == 2:  # TODO: is cr2 == 2 necessary?
+            if cr1 == 2:
                 m.addConstrs(
                     var_swap(x, b, c, i) + var_swap(x, a, b, i) + var_swap(x, c, d, i) <=
                     2 * z[i] + var_swap(x, a, d, i) for i in self.bicliques)
@@ -303,3 +304,149 @@ class ExtendedModel(BaseMinimumBicliqueCoverGpSolver):
     @classmethod
     def name(cls) -> str:
         return 'Extended Model'
+
+
+class CGModel(BaseMinimumBicliqueCoverSolver):
+    def __init__(self, g: nx.Graph, config: RunConfig):
+        super().__init__(g, config)
+        self._solution_bicliques = []
+        self._obj_val = None
+        self._status = None
+        self._columns_added = 0
+        self._master_time = 0
+        self._pricing_time = 0
+        self._vertices = list(self._g.nodes)
+        self._edges = list({(min(u, v), max(u, v)) for u, v in self._g.edges})
+
+    def _do_solve(self) -> None:
+        master = gp.Model("master")
+        master.setParam('OutputFlag', 0)
+
+        # Start with singleton bicliques (one per edge)
+        bicliques = [{e} for e in self._edges]
+        x = {}
+        for i, B in enumerate(bicliques):
+            x[i] = master.addVar(lb=0, ub=1, obj=1.0, vtype=GRB.CONTINUOUS, name=f"x_{i}", column=None)
+
+        cover_constraints = {}
+        for e in self._edges:
+            cover_constraints[e] = master.addConstr(
+                gp.quicksum(x[i] for i, B in enumerate(bicliques) if e in B) >= 1,
+                name=f"cover_{e}"
+            )
+        master.update()
+
+        # Column Generation Loop
+        while True:
+            _, m_time = chronometer(lambda: master.optimize())
+            self._master_time += m_time
+
+            duals = {e: cover_constraints[e].Pi for e in self._edges}
+
+            new_biclique, p_time = chronometer(self._solve_pricing, duals)
+            self._pricing_time += p_time
+
+            if new_biclique is None:
+                break
+
+            idx = len(x)
+            x[idx] = master.addVar(lb=0, ub=1, obj=1.0, vtype=GRB.CONTINUOUS, name=f"x_{idx}", column=None)
+            for e in new_biclique:
+                master.remove(cover_constraints[e])
+                cover_constraints[e] = master.addConstr(
+                    gp.quicksum(x[i] for i, B in enumerate(bicliques) if e in B) + x[idx] >= 1,
+                    name=f"cover_{e}"
+                )
+            bicliques.append(new_biclique)
+            master.update()
+            self._columns_added += 1
+
+        self._status = master.status
+        self._obj_val = master.ObjVal
+        self._solution_bicliques = [bicliques[i] for i in x if x[i].X > 1e-6]
+
+    def _solve_pricing(self, duals):
+        pricing = gp.Model("pricing")
+        pricing.setParam('OutputFlag', 0)
+
+        all_pairs = {(min(u, v), max(u, v)) for u in self._vertices for v in self._vertices if u != v}
+        non_edges = all_pairs - set(self._edges)
+
+        y = {u: pricing.addVar(lb=0, ub=1, vtype=GRB.BINARY, name=f"y_{u}", column=None, obj=0)
+             for u in self._vertices}
+        w = {u: pricing.addVar(lb=0, ub=1, vtype=GRB.BINARY, name=f"w_{u}", column=None, obj=0)
+             for u in self._vertices}
+        z = {e: pricing.addVar(lb=0, ub=1, vtype=GRB.BINARY, name=f"z_{e}", column=None, obj=duals[e])
+             for e in self._edges}
+
+        pricing.modelSense = GRB.MAXIMIZE
+
+        for (u, v) in self._edges:
+            pricing.addConstr(z[(u, v)] <= y[u], name=f"z_{(u, v)} <= y_{u}")
+            pricing.addConstr(z[(u, v)] <= w[v], name=f"z_{(u, v)} <= w_{v}")
+            pricing.addConstr(z[(u, v)] >= y[u] + w[v] - 1, name=f"z_{(u, v)} >= y_{u} + w_{v} - 1")
+
+        for (u, v) in non_edges:
+            pricing.addConstr(y[u] + w[v] <= 1, name=f"y_{u} + w_{v} <= 1")
+
+        for u in self._vertices:
+            pricing.addConstr(y[u] + w[u] <= 1, name=f"y_{u} + w_{u} <= 1")
+
+        pricing.optimize()
+
+        if pricing.status != GRB.OPTIMAL or pricing.ObjVal <= 1 + 1e-6:
+            return None
+
+        return {e for e in self._edges if z[e].X > 0.5}
+
+    def _do_get_solution(self) -> float:
+        return self._obj_val
+
+    def is_feasible(self) -> bool:
+        covered = set()
+        for biclique in self._solution_bicliques:
+            covered.update(biclique)
+        return set(self._g.edges) <= covered
+
+    def _check_biclique_cover(self) -> bool:
+        for edge_set in self._solution_bicliques:
+            left = set(u for u, v in edge_set)
+            right = set(v for u, v in edge_set)
+            for u in left:
+                for v in right:
+                    if not self._g.has_edge(u, v):
+                        return False
+        return True
+
+    def _post_solve(self) -> None:
+        if self._status == GRB.TIME_LIMIT:
+            print(f'Model reached time limit of {self._config.time_limit} seconds.\n')
+        elif self._status == GRB.INFEASIBLE:
+            print('Model is unfeasible.\n')
+        elif self._status == GRB.OPTIMAL:
+            print("Final LP Objective (Lower Bound on MBCP):", self._obj_val, '\n')
+            for i, biclique in enumerate(self._solution_bicliques):
+                print(f"Biclique {i}: {sorted(biclique)}")
+            print(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
+
+    @property
+    def columns_added(self) -> int:
+        if not self._solved:
+            raise NotYetSolvedError()
+        return self._columns_added
+
+    @property
+    def master_time(self) -> float:
+        if not self._solved:
+            raise NotYetSolvedError()
+        return self._master_time
+
+    @property
+    def pricing_time(self) -> float:
+        if not self._solved:
+            raise NotYetSolvedError()
+        return self._pricing_time
+
+    @classmethod
+    def name(cls) -> str:
+        return 'Column Generation'

@@ -1,0 +1,16 @@
+{
+  "report_name":  "test-column-generation-$ts",
+  "default_time_limit": 300,
+  "run_configs": [
+    {
+      "graph": "simple_5_7.gml",
+      "model": "CGModel",
+      "name": "$graph-NaturalModel"
+    },
+    {
+      "graph": "simple_5_7.gml",
+      "model": "CGModel",
+      "name": "$graph-NaturalModel"
+    }
+  ]
+}
