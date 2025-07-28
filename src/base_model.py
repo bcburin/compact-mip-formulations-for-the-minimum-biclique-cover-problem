@@ -199,10 +199,6 @@ class BaseMinimumBicliqueCoverSolver(BaseSolver):
         ...
 
 
-def _log_message(msg, *args, **kwargs):
-    print(msg, args, kwargs)
-
-
 class BaseMinimumBicliqueCoverGpSolver(BaseMinimumBicliqueCoverSolver, BaseGpSolver, ABC):
 
     def __init__(self, g: nx.Graph, config: RunConfig):
@@ -217,13 +213,13 @@ class BaseMinimumBicliqueCoverGpSolver(BaseMinimumBicliqueCoverSolver, BaseGpSol
         # check and log the solution
         if self.m.status == GRB.OPTIMAL:
             # check the solution
-            _log_message(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
+            print(f'Is it a biclique cover? {"Yes" if self._check_biclique_cover() else "No"}.\n')
         elif self.m.status == GRB.TIME_LIMIT:
-            _log_message(f'Model reached time limit of {self._config.time_limit} seconds.\n')
+            print(f'Model reached time limit of {self._config.time_limit} seconds.\n')
         elif self.m.status == GRB.INFEASIBLE:
-            _log_message('Model is unfeasible.\n')
+            print('Model is unfeasible.\n')
         else:
-            _log_message(f'Status code: {self.m.status}\n')
+            print(f'Status code: {self.m.status}\n')
 
     @classmethod
     def name(cls):
