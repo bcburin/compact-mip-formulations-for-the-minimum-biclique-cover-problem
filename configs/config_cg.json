@@ -1,0 +1,26 @@
+{
+  "report_name": "column-generation-$ts",
+  "default_time_limit": 300,
+  "run_configs": [
+    {
+      "graph": "surfers.txt",
+      "model": "CGModel",
+      "name": "surfers-natural-model"
+    },
+    {
+      "graph": "lesmis76.gml",
+      "model": "CGModel",
+      "name": "lesmis-natural-model"
+    },
+    {
+      "graph": "football114.gml",
+      "model": "CGModel",
+      "name": "football-natural-model"
+    },
+    {
+      "graph": "jazz-musicians.txt",
+      "model": "CGModel",
+      "name": "jazz-natural-model"
+    }
+  ]
+}
