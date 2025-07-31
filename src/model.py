@@ -314,6 +314,7 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
         super().__init__(g, config)
         self._solution_bicliques = []
         self._obj_val = None
+        self._obj_bound = None
         self._status = None
         self._columns_added = 0
         self._master_time = 0
@@ -379,8 +380,11 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
             self._columns_added += 1
 
         self._status = master.status
+        self._obj_bound = master.ObjBound
         try:
-            self._obj_val = master.ObjVal if master.status not in self._TIMEOUT_STATUSES else master.ObjBoundC
+            self._obj_val = master.ObjVal \
+                if master.status not in self._TIMEOUT_STATUSES and master.status not in self._INFEASIBLE_STATUSES \
+                else master.ObjBound
         except gp.GurobiError:
             self._obj_val = master.ObjBoundC
         self._solution_bicliques = [bicliques[i] for i in x if x[i].X > 1e-6]
@@ -471,6 +475,12 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
         if not self._solved:
             raise NotYetSolvedError()
         return self._pricing_time
+
+    @property
+    def best_known_solution(self):
+        if not self._solved:
+            raise NotYetSolvedError()
+        return self._obj_bound
 
     @classmethod
     def name(cls) -> str:

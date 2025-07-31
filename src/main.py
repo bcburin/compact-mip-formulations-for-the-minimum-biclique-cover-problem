@@ -68,7 +68,9 @@ def create_and_save_column_generation_report(config: ReportConfig):
             report.add_graph_data(g, run_config.resolved_gname)
             report.add_property_values(p_name=str_model, p_value=model.name())
             report.add_property_values(p_name=str_columns_added, p_value=model.columns_added)
-            report.add_property_values(p_name=str_obj_val, p_value=model.solution)
+            report.add_property_values(
+                p_name=str_obj_val,
+                p_value=model.solution if model.is_feasible() else model.best_known_solution)
             report.add_property_values(p_name=str_master_time, p_value=model.master_time)
             report.add_property_values(p_name=str_pricing_time, p_value=model.pricing_time)
             report.add_property_values(p_name=str_total_time, p_value=time)
