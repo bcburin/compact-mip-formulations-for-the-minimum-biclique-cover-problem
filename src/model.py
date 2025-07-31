@@ -307,6 +307,9 @@ class ExtendedModel(BaseMinimumBicliqueCoverGpSolver):
 
 
 class CGModel(BaseMinimumBicliqueCoverSolver):
+    _INFEASIBLE_STATUSES = [GRB.INFEASIBLE, GRB.INF_OR_UNBD, GRB.INTERRUPTED, GRB.LOADED]
+    _TIMEOUT_STATUSES = [GRB.TIME_LIMIT, GRB.INTERRUPTED]
+
     def __init__(self, g: nx.Graph, config: RunConfig):
         super().__init__(g, config)
         self._solution_bicliques = []
@@ -317,6 +320,9 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
         self._pricing_time = 0
         self._vertices = list(self._g.nodes)
         self._edges = list({(min(u, v), max(u, v)) for u, v in self._g.edges})
+        # non edges
+        all_pairs = {(min(u, v), max(u, v)) for u in self._vertices for v in self._vertices if u != v}
+        self._non_edges = all_pairs - set(self._edges)
 
     def _do_solve(self) -> None:
         master = gp.Model("master")
@@ -338,12 +344,23 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
 
         # Column Generation Loop
         while True:
+            elapsed_time = self._master_time + self._pricing_time
+            remaining_time = self._config.time_limit - elapsed_time
+            if remaining_time <= 0:
+                break
+
+            master.setParam('TimeLimit', remaining_time)
             _, m_time = chronometer(lambda: master.optimize())
             self._master_time += m_time
+            if master.status in self._TIMEOUT_STATUSES:
+                break
 
             duals = {e: cover_constraints[e].Pi for e in self._edges}
 
-            new_biclique, p_time = chronometer(self._solve_pricing, duals)
+            remaining_time -= m_time
+            if remaining_time <= 0:
+                break
+            new_biclique, p_time = chronometer(self._solve_pricing, duals, remaining_time)
             self._pricing_time += p_time
 
             if new_biclique is None:
@@ -362,15 +379,16 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
             self._columns_added += 1
 
         self._status = master.status
-        self._obj_val = master.ObjVal
+        try:
+            self._obj_val = master.ObjVal if master.status not in self._TIMEOUT_STATUSES else master.ObjBoundC
+        except gp.GurobiError:
+            self._obj_val = master.ObjBoundC
         self._solution_bicliques = [bicliques[i] for i in x if x[i].X > 1e-6]
 
-    def _solve_pricing(self, duals):
+    def _solve_pricing(self, duals, time_limit: int | None = None):
         pricing = gp.Model("pricing")
         pricing.setParam('OutputFlag', 0)
-
-        all_pairs = {(min(u, v), max(u, v)) for u in self._vertices for v in self._vertices if u != v}
-        non_edges = all_pairs - set(self._edges)
+        pricing.setParam('TimeLimit', time_limit)
 
         y = {u: pricing.addVar(lb=0, ub=1, vtype=GRB.BINARY, name=f"y_{u}", column=None, obj=0)
              for u in self._vertices}
@@ -382,40 +400,47 @@ class CGModel(BaseMinimumBicliqueCoverSolver):
         pricing.modelSense = GRB.MAXIMIZE
 
         for (u, v) in self._edges:
-            pricing.addConstr(z[(u, v)] <= y[u], name=f"z_{(u, v)} <= y_{u}")
-            pricing.addConstr(z[(u, v)] <= w[v], name=f"z_{(u, v)} <= w_{v}")
-            pricing.addConstr(z[(u, v)] >= y[u] + w[v] - 1, name=f"z_{(u, v)} >= y_{u} + w_{v} - 1")
+            pricing.addConstr(z[(u, v)] <= y[u] + y[v])
+            pricing.addConstr(z[(u, v)] <= w[v] + w[u])
+            pricing.addConstr(z[(u, v)] >= y[u] + w[v] - 1)
+            pricing.addConstr(z[(u, v)] >= y[v] + w[u] - 1)
 
-        for (u, v) in non_edges:
-            pricing.addConstr(y[u] + w[v] <= 1, name=f"y_{u} + w_{v} <= 1")
+        for (u, v) in self._non_edges:
+            pricing.addConstr(y[u] + w[v] <= 1)
+            pricing.addConstr(y[v] + w[u] <= 1)
 
         for u in self._vertices:
             pricing.addConstr(y[u] + w[u] <= 1, name=f"y_{u} + w_{u} <= 1")
 
         pricing.optimize()
 
-        if pricing.status != GRB.OPTIMAL or pricing.ObjVal <= 1 + 1e-6:
+        if pricing.status != GRB.OPTIMAL or pricing.ObjVal <= 1:
             return None
 
-        return {e for e in self._edges if z[e].X > 0.5}
+        y_resolved = [u for u in self._vertices if y[u].X > 0.5]
+        w_resolved = [u for u in self._vertices if w[u].X > 0.5]
+        biclique = {
+            (min(u, v), max(u, v)) for u in y_resolved for v in w_resolved if (min(u, v), max(u, v)) in self._edges}
+        return biclique
 
     def _do_get_solution(self) -> float:
         return self._obj_val
 
     def is_feasible(self) -> bool:
-        covered = set()
-        for biclique in self._solution_bicliques:
-            covered.update(biclique)
-        return set(self._g.edges) <= covered
+        return self._status not in self._INFEASIBLE_STATUSES
 
     def _check_biclique_cover(self) -> bool:
+        # check if it's a cover
+        covered_edges = set()
         for edge_set in self._solution_bicliques:
-            left = set(u for u, v in edge_set)
-            right = set(v for u, v in edge_set)
-            for u in left:
-                for v in right:
-                    if not self._g.has_edge(u, v):
-                        return False
+            covered_edges.update((min(u, v), max(u, v)) for u, v in edge_set)
+        graph_edges = set((min(u, v), max(u, v)) for u, v in self._g.edges)
+        if not graph_edges.issubset(covered_edges):
+            return False
+        # check if each set of edges forms a biclique
+        for edge_set in self._solution_bicliques:
+            if not is_biclique(self._g, edge_set):
+                return False
         return True
 
     def _post_solve(self) -> None:
